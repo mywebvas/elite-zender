@@ -1,0 +1,28 @@
+# Dependencies
+/vendor
+/node_modules
+
+# Build artifacts
+/public/build
+/public/hot
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Storage & logs
+/storage/*.key
+/storage/logs/*.log
+/storage/framework/cache/data/*
+/storage/framework/sessions/*
+/storage/framework/views/*
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.idea
+.vscode
+
+# Archived reference codebase (preserved locally, not versioned here)
+/specimen1

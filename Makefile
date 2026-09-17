@@ -13,7 +13,7 @@ setup:
 	@echo "Setup complete! Run 'make dev' to start the application."
 
 dev:
-	php artisan serve & npm run dev
+	php artisan serve --port=8085 & npm run dev
 
 test:
 	php artisan test

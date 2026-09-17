@@ -7,16 +7,16 @@
 
 it('allows up to 5 login attempts per minute before throttling', function () {
     for ($i = 0; $i < 5; $i++) {
-        $response = $this->postJson('/api/v1/auth/login', [
+        $response = $this->postJson('/login', [
             'email'    => 'test@example.com',
             'password' => 'wrongpassword',
         ]);
-        // We expect 501 (Not Implemented stub) — not 429
-        $response->assertStatus(501);
+        // We expect validation error (422) since test@example.com doesn't exist, not 501.
+        $response->assertStatus(422);
     }
 
     // 6th attempt should be throttled
-    $response = $this->postJson('/api/v1/auth/login', [
+    $response = $this->postJson('/login', [
         'email'    => 'test@example.com',
         'password' => 'wrongpassword',
     ]);
@@ -29,20 +29,20 @@ it('allows up to 5 login attempts per minute before throttling', function () {
 it('returns RATE_LIMITED error code in JSON on throttle', function () {
     // Exhaust the limit
     for ($i = 0; $i < 6; $i++) {
-        $this->postJson('/api/v1/auth/login', ['email' => 'x@x.com', 'password' => 'y']);
+        $this->postJson('/login', ['email' => 'x@x.com', 'password' => 'y']);
     }
 
-    $response = $this->postJson('/api/v1/auth/login', ['email' => 'x@x.com', 'password' => 'y']);
+    $response = $this->postJson('/login', ['email' => 'x@x.com', 'password' => 'y']);
     $response->assertStatus(429)
              ->assertJsonPath('error.code', 'RATE_LIMITED');
 });
 
 it('returns 429 with rate limit info on throttle', function () {
     for ($i = 0; $i < 6; $i++) {
-        $this->postJson('/api/v1/auth/login', ['email' => 'a@b.com', 'password' => 'c']);
+        $this->postJson('/login', ['email' => 'a@b.com', 'password' => 'c']);
     }
 
-    $response = $this->postJson('/api/v1/auth/login', ['email' => 'a@b.com', 'password' => 'c']);
+    $response = $this->postJson('/login', ['email' => 'a@b.com', 'password' => 'c']);
     // Array cache doesn't emit Retry-After; Redis cache does. Assert the status and body.
     $response->assertStatus(429)
              ->assertJsonPath('error.code', 'RATE_LIMITED');

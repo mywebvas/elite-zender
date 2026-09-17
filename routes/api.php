@@ -14,25 +14,7 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-// ---------------------------------------------------------------------------
-// Pre-auth: rate-limited per IP — no tenant context needed
-// ---------------------------------------------------------------------------
-Route::prefix('v1/auth')->middleware('throttle:login')->group(function () {
-    // POST /api/v1/auth/register  — creates tenant + owner atomically
-    Route::post('register', fn () => response()->json(['message' => 'Not implemented'], 501));
-
-    // POST /api/v1/auth/login
-    Route::post('login', fn () => response()->json(['message' => 'Not implemented'], 501));
-
-    // POST /api/v1/auth/logout
-    Route::post('logout', fn () => response()->json(['message' => 'Not implemented'], 501));
-
-    // POST /api/v1/auth/forgot-password
-    Route::post('forgot-password', fn () => response()->json(['message' => 'Not implemented'], 501));
-
-    // POST /api/v1/auth/reset-password
-    Route::post('reset-password', fn () => response()->json(['message' => 'Not implemented'], 501));
-});
+// Fortify handles auth routes. If API tokens are used later, they use Sanctum's createToken.
 
 // ---------------------------------------------------------------------------
 // Authenticated API — tenant-scoped, plan-tiered rate limit

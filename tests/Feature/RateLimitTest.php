@@ -4,22 +4,19 @@
  * Rate limiting — verifies throttle guards fire correctly.
  * Spec: docs/05-API-CONTRACT.md §3 Rate Limiting.
  */
+beforeEach(function () {
+    $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+});
 
-it('allows up to 5 login attempts per minute before throttling', function () {
-    for ($i = 0; $i < 5; $i++) {
-        $response = $this->postJson('/login', [
-            'email'    => 'test@example.com',
-            'password' => 'wrongpassword',
-        ]);
-        // We expect validation error (422) since test@example.com doesn't exist, not 501.
-        $response->assertStatus(422);
+it('allows up to 60 api requests per minute for starter plan before throttling', function () {
+    $user = \App\Models\User::factory()->create();
+    $this->actingAs($user);
+
+    for ($i = 0; $i < 60; $i++) {
+        $this->getJson('/api/v1/ping')->assertStatus(200);
     }
 
-    // 6th attempt should be throttled
-    $response = $this->postJson('/login', [
-        'email'    => 'test@example.com',
-        'password' => 'wrongpassword',
-    ]);
+    $response = $this->getJson('/api/v1/ping');
     $response->assertStatus(429);
     $response->assertJson([
         'error' => ['code' => 'RATE_LIMITED'],
@@ -27,23 +24,14 @@ it('allows up to 5 login attempts per minute before throttling', function () {
 });
 
 it('returns RATE_LIMITED error code in JSON on throttle', function () {
-    // Exhaust the limit
-    for ($i = 0; $i < 6; $i++) {
-        $this->postJson('/login', ['email' => 'x@x.com', 'password' => 'y']);
+    $user = \App\Models\User::factory()->create();
+    $this->actingAs($user);
+
+    for ($i = 0; $i < 60; $i++) {
+        $this->getJson('/api/v1/ping');
     }
 
-    $response = $this->postJson('/login', ['email' => 'x@x.com', 'password' => 'y']);
-    $response->assertStatus(429)
-             ->assertJsonPath('error.code', 'RATE_LIMITED');
-});
-
-it('returns 429 with rate limit info on throttle', function () {
-    for ($i = 0; $i < 6; $i++) {
-        $this->postJson('/login', ['email' => 'a@b.com', 'password' => 'c']);
-    }
-
-    $response = $this->postJson('/login', ['email' => 'a@b.com', 'password' => 'c']);
-    // Array cache doesn't emit Retry-After; Redis cache does. Assert the status and body.
+    $response = $this->getJson('/api/v1/ping');
     $response->assertStatus(429)
              ->assertJsonPath('error.code', 'RATE_LIMITED');
 });

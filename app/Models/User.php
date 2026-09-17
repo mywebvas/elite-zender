@@ -3,6 +3,7 @@
 namespace App\Models;
 
 // use Illuminate\Contracts\Auth\MustVerifyEmail;
+use App\Tenancy\Auditable;
 use App\Tenancy\HasUuid7;
 use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -17,7 +18,7 @@ use Illuminate\Notifications\Notifiable;
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, HasUuid7, Notifiable;
+    use Auditable, HasFactory, HasUuid7, Notifiable;
 
     public function tenant(): BelongsTo
     {

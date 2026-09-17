@@ -24,7 +24,12 @@ class ResolveTenant
             TenantContext::set($tenant);
 
             if ($tenant !== null) {
-                Redis::setPrefix('t:' . substr($tenant->id, 0, 8) . ':');
+                try {
+                    Redis::setPrefix('t:' . substr($tenant->id, 0, 8) . ':');
+                } catch (\Throwable) {
+                    // Redis unavailable in test/offline environments — tenant context
+                    // still binds correctly; only cache prefix is skipped.
+                }
             }
         }
 

@@ -2,18 +2,23 @@
 
 namespace Tests\Feature;
 
-// use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 class ExampleTest extends TestCase
 {
     /**
-     * A basic test example.
+     * Root / redirects guests to /login (302).
+     * See routes/web.php — auth redirects handled there.
      */
-    public function test_the_application_returns_a_successful_response(): void
+    public function test_the_application_root_redirects_guests(): void
     {
         $response = $this->get('/');
+        $response->assertRedirect('/login');
+    }
 
+    public function test_offline_page_returns_200(): void
+    {
+        $response = $this->get('/offline');
         $response->assertStatus(200);
     }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Tenancy\Auditable;
 use App\Tenancy\HasTenant;
 use App\Tenancy\HasUuid7;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -14,7 +15,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  */
 class Campaign extends Model
 {
-    use HasFactory, HasTenant, HasUuid7, SoftDeletes;
+    use Auditable, HasFactory, HasTenant, HasUuid7, SoftDeletes;
 
     protected $fillable = [
         'tenant_id', 'name', 'subject', 'body_html', 'body_text',

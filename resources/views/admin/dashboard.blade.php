@@ -1,4 +1,30 @@
-<x-layouts.admin title="Overview">
+<x-layouts.admin title="Overview" subtitle="The whole platform, at a glance.">
+
+    {{-- Anything here means "go and look at something now". Shown before the
+         vanity metrics on purpose. --}}
+    @php $needsAttention = array_filter($attention); @endphp
+    @if($needsAttention)
+        <div class="mb-6 rounded-xl border border-amber-500/30 bg-amber-500/[0.07] p-4">
+            <p class="text-sm font-semibold text-amber-300">Needs attention</p>
+            <div class="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-amber-200/90">
+                @if($attention['failed_jobs'])
+                    <a href="{{ route('admin.system.index') }}" class="underline-offset-2 hover:underline">
+                        {{ $attention['failed_jobs'] }} failed job(s) — usually somebody's campaign
+                    </a>
+                @endif
+                @if($attention['paused_automations'])
+                    <a href="{{ route('admin.system.index') }}" class="underline-offset-2 hover:underline">
+                        {{ $attention['paused_automations'] }} paused automation enrolment(s)
+                    </a>
+                @endif
+                @if($attention['suspended_tenants'])
+                    <a href="{{ route('admin.tenants.index', ['status' => 'suspended']) }}" class="underline-offset-2 hover:underline">
+                        {{ $attention['suspended_tenants'] }} suspended workspace(s)
+                    </a>
+                @endif
+            </div>
+        </div>
+    @endif
 
     <div class="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-6">
         @foreach([
@@ -91,7 +117,31 @@
         </div>
     </div>
 
-    <div class="mt-4 rounded-xl border border-white/10 bg-[#0b0b14]">
+    <div class="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+    <div class="rounded-xl border border-white/10 bg-[#0b0b14]">
+        <div class="flex items-center justify-between border-b border-white/10 px-5 py-3">
+            <h2 class="text-sm font-semibold">Recent operator activity</h2>
+            <a href="{{ route('admin.activity.index') }}" class="text-xs text-amber-500 hover:underline">Full audit trail →</a>
+        </div>
+        @forelse($recentActivity as $entry)
+            <div class="flex gap-2.5 border-b border-white/5 px-5 py-2.5 text-sm last:border-0">
+                <span @class([
+                    'mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full',
+                    'bg-rose-400' => $entry->severity === 'critical',
+                    'bg-amber-400' => $entry->severity === 'notice',
+                    'bg-slate-600' => $entry->severity === 'info',
+                ])></span>
+                <div class="min-w-0 flex-1">
+                    <p class="truncate">{{ $entry->description }}</p>
+                    <p class="text-xs text-slate-500">{{ $entry->admin_email }} · {{ $entry->created_at?->diffForHumans() }}</p>
+                </div>
+            </div>
+        @empty
+            <p class="px-5 py-8 text-center text-sm text-slate-500">No operator actions recorded yet.</p>
+        @endforelse
+    </div>
+
+    <div class="rounded-xl border border-white/10 bg-[#0b0b14]">
         <div class="border-b border-white/10 px-5 py-3">
             <h2 class="text-sm font-semibold">Newest workspaces</h2>
         </div>
@@ -107,5 +157,6 @@
                 </span>
             </a>
         @endforeach
+    </div>
     </div>
 </x-layouts.admin>

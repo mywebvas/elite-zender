@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Platform\ActivityLogger;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,6 +46,9 @@ class AuthController extends Controller
         if (! $guard->attempt($credentials + ['is_active' => true], $request->boolean('remember'))) {
             RateLimiter::hit($key, 900);
 
+            // Failed attempts stay in the application log only: writing an
+            // attacker-supplied email into an audit table on every guess is a
+            // free way to fill the disk.
             Log::warning('Failed admin login', ['email' => $credentials['email'], 'ip' => $request->ip()]);
 
             throw ValidationException::withMessages(['email' => __('auth.failed')]);
@@ -57,7 +61,11 @@ class AuthController extends Controller
         $admin = $guard->user();
         $admin?->forceFill(['last_login_at' => now(), 'last_login_ip' => $request->ip()])->save();
 
-        Log::info('Admin signed in', ['admin_id' => $admin?->getKey(), 'ip' => $request->ip()]);
+        app(ActivityLogger::class)->record(
+            action: 'admin.sign_in',
+            description: 'Signed in to the operator console',
+            subject: $admin,
+        );
 
         return redirect()->intended(route('admin.dashboard'));
     }

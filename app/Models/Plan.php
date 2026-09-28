@@ -23,7 +23,6 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @method static Builder<static> active()
  * @method static Builder<static> public()
  * @method static Builder<static> query()
- * @method static Builder<static> create(array<string, mixed> $attributes)
  */
 class Plan extends Model
 {

@@ -64,6 +64,14 @@ Schedule::command(PurgeAuditLogs::class)
     ->withoutOverlapping()
     ->onOneServer();
 
+// Heartbeat for the operator health page. An empty queue looks identical
+// whether workers are flying or dead; this is the only honest signal that the
+// scheduler itself is alive.
+Schedule::call(fn () => cache()->put('scheduler:heartbeat', now()->toIso8601String(), now()->addHours(6)))
+    ->everyFiveMinutes()
+    ->name('scheduler-heartbeat')
+    ->withoutOverlapping();
+
 // Keep the failed_jobs table bounded; anything older has been triaged or lost.
 Schedule::command('queue:prune-failed', ['--hours' => 720])->daily();
 Schedule::command('queue:prune-batches', ['--hours' => 720])->daily();

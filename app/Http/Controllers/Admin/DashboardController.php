@@ -3,8 +3,10 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Models\AdminActivity;
 use App\Models\Campaign;
 use App\Models\Contact;
+use App\Models\ContactAutomation;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Subscription;
@@ -61,6 +63,15 @@ class DashboardController extends Controller
                 ->limit(10)
                 ->get(),
             'newestTenants' => Tenant::query()->withCount('users')->latest()->limit(8)->get(),
+
+            // The three things that mean "go and look at something now".
+            'attention' => [
+                'failed_jobs' => DB::table('failed_jobs')->count(),
+                'paused_automations' => ContactAutomation::withoutGlobalScopes()
+                    ->where('status', ContactAutomation::STATUS_PAUSED)->count(),
+                'suspended_tenants' => Tenant::query()->where('status', Tenant::STATUS_SUSPENDED)->count(),
+            ],
+            'recentActivity' => AdminActivity::with('tenant:id,name')->latest('created_at')->limit(8)->get(),
         ]);
     }
 

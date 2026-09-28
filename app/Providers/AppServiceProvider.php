@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -33,12 +34,40 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->applyPlatformSettings();
         $this->configureModels();
         $this->configureDates();
         $this->configurePasswords();
         $this->configureUrls();
         $this->configureThrottling();
         $this->registerRateLimiters();
+    }
+
+    /**
+     * Push operator-managed settings over the compiled config.
+     *
+     * Wrapped defensively: during `migrate` on a fresh database the settings
+     * table does not exist yet, and an installation must never be unable to
+     * boot far enough to create it.
+     */
+    private function applyPlatformSettings(): void
+    {
+        if ($this->app->runningInConsole() && ! $this->app->environment('testing')) {
+            // Migrations and key:generate run before the table can exist.
+            try {
+                app(\App\Platform\Settings::class)->apply();
+            } catch (Throwable) {
+                // Intentionally silent: no settings simply means config wins.
+            }
+
+            return;
+        }
+
+        try {
+            app(\App\Platform\Settings::class)->apply();
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     /**

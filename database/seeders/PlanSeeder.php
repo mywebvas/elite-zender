@@ -30,7 +30,7 @@ class PlanSeeder extends Seeder
             ];
 
             if ($existing === null) {
-                Plan::create([
+                Plan::query()->create([
                     'code' => $definition['code'],
                     'price_ngn' => $definition['price']['NGN'] ?? null,
                     'price_usd' => $definition['price']['USD'] ?? null,

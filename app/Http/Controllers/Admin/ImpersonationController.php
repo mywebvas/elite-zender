@@ -4,8 +4,10 @@ namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
 use App\Models\Admin;
+use App\Models\AdminActivity;
 use App\Models\AdminImpersonation;
 use App\Models\User;
+use App\Platform\ActivityLogger;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -50,12 +52,14 @@ class ImpersonationController extends Controller
             'started_at' => now(),
         ]);
 
-        Log::warning('Admin started impersonation', [
-            'admin_id' => $admin->getKey(),
-            'user_id' => $user->getKey(),
-            'tenant_id' => $user->tenant_id,
-            'reason' => $validated['reason'] ?? null,
-        ]);
+        app(ActivityLogger::class)->record(
+            action: 'impersonation.start',
+            description: "Signed in as {$user->email}",
+            subject: $user,
+            tenantId: $user->tenant_id,
+            severity: AdminActivity::SEVERITY_CRITICAL,
+            reason: $validated['reason'] ?? null,
+        );
 
         /** @var \Illuminate\Contracts\Auth\StatefulGuard $web */
         $web = Auth::guard('web');
@@ -76,7 +80,12 @@ class ImpersonationController extends Controller
         if ($id !== null) {
             AdminImpersonation::whereKey($id)->update(['ended_at' => now()]);
 
-            Log::info('Admin ended impersonation', ['impersonation_id' => $id]);
+            app(ActivityLogger::class)->record(
+                action: 'impersonation.stop',
+                description: 'Ended an impersonation session',
+                tenantId: $request->session()->get('impersonation.tenant_id'),
+                severity: AdminActivity::SEVERITY_NOTICE,
+            );
         }
 
         /** @var \Illuminate\Contracts\Auth\StatefulGuard $web */

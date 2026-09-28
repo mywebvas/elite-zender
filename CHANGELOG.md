@@ -6,6 +6,46 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — the operator console becomes a real control plane
+
+- **Audit trail.** Every destructive operator action is written to
+  `admin_activity_log`: who, what, which workspace, the before/after, the IP,
+  and a free-text reason. Previously these went to a log *file* — unqueryable,
+  and rotated away long before anyone asks "who suspended this customer?".
+  Filterable by operator, action, severity and date, and exportable as CSV.
+  Entries are immutable and secrets are redacted before they are written.
+- **Platform settings.** Trial length, grace period, default currency, product
+  name, signups open/closed and every payment-gateway credential are now
+  editable from the console and take effect immediately. Rotating a leaked
+  Stripe key or closing registration during an incident no longer needs a
+  deploy. Settings are an *override layer*: anything unset falls through to
+  `config()`, so an empty table behaves exactly like today.
+- **API keys.** Scoped, expiring, IP-restrictable platform keys. Only a
+  SHA-256 is stored, so a database dump cannot be replayed as API access, and
+  the plaintext is shown exactly once.
+- **Operator management.** Create, re-role, deactivate and reset operators from
+  the UI. Self-elevation is blocked, and the last active super admin cannot be
+  deactivated — that state is unrecoverable without shell access.
+- **Plan lifecycle.** Plans can now be created (private until published) and
+  archived. A plan with subscribers is never hard-deleted, because invoices
+  reference it.
+- **System health.** Database, cache, storage, scheduler heartbeat, failed
+  jobs, stuck campaigns and paused automations, plus queue depth and the
+  schedule — with retry and discard for failed jobs.
+- **Cross-tenant support tools.** Find any user by email, reset their password
+  and end every session in one action, change a role to recover a locked-out
+  owner, and look up or manage suppressions.
+- **Global search** across workspaces, users and invoices.
+- Console shell rebuilt: grouped navigation, super-admin-only sections hidden
+  rather than 403ing, one-time secret reveal with copy-to-clipboard, and a
+  "needs attention" band above the metrics.
+
+### Fixed
+
+- `SuppressionController::store` read `$validated['tenant_id']` directly; a
+  nullable field that is not submitted has no key at all, so the common path
+  was an undefined-index 500.
+
 ### Added — automations, recurring billing and a design-system pass
 
 - **Automations execute.** `app/Automations` adds enrolment, a step runner for

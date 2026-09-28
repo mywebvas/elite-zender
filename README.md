@@ -41,6 +41,7 @@ same audience so the next send is cleaner than the last.
 | Payments: Stripe (cards saved for automatic renewal) | ✅ |
 | Recurring billing, dunning, proration, cancel/resume | ✅ |
 | Operator console: separate guard, impersonation, plan control | ✅ |
+| Operator audit trail, settings, API keys, health, team management | ✅ |
 
 ---
 
@@ -81,6 +82,7 @@ Key building blocks:
 | `app/Automations/` | Enrolment engine and step runner |
 | `app/Billing/` | Gateways, invoicing state machine, plan limits, dunning |
 | `app/Http/Controllers/Admin/` | Operator console (separate `admin` guard) |
+| `app/Platform/` | Audit logger, runtime settings, health checks |
 | `docs/` | Decision log and module specs — **read `docs/README.md` first** |
 
 ---
@@ -132,6 +134,11 @@ php artisan elitesender:make-admin
 
 Then sign in at `/admin`. Operators live in their own table behind their own
 guard, so a customer session can never reach the console (and vice versa).
+
+From there everything else is self-service: further operators, plans and
+pricing, payment-gateway credentials, API keys, suppressions, system health and
+the full audit trail. The only thing that still needs shell access is creating
+the very first operator — deliberately.
 
 ### Background processing
 

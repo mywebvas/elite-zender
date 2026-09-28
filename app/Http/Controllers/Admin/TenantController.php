@@ -5,22 +5,24 @@ namespace App\Http\Controllers\Admin;
 use App\Billing\BillingService;
 use App\Billing\PlanGate;
 use App\Http\Controllers\Controller;
+use App\Models\AdminActivity;
 use App\Models\Campaign;
 use App\Models\Contact;
 use App\Models\Plan;
 use App\Models\SmtpAccount;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Platform\ActivityLogger;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 
 class TenantController extends Controller
 {
     public function __construct(
         private readonly BillingService $billing,
         private readonly PlanGate $planGate,
+        private readonly ActivityLogger $activity,
     ) {}
 
     public function index(Request $request): View
@@ -69,16 +71,22 @@ class TenantController extends Controller
             'reason' => ['nullable', 'string', 'max:255'],
         ]);
 
+        $before = $tenant->status;
         $tenant->forceFill(['status' => $validated['status']])->save();
 
-        Log::warning('Admin changed workspace status', [
-            'admin_id' => auth('admin')->id(),
-            'tenant_id' => $tenant->id,
-            'status' => $validated['status'],
-            'reason' => $validated['reason'] ?? null,
-        ]);
+        $this->activity->record(
+            action: $validated['status'] === Tenant::STATUS_SUSPENDED ? 'tenant.suspend' : 'tenant.reinstate',
+            description: sprintf('%s workspace “%s”', $validated['status'] === Tenant::STATUS_SUSPENDED ? 'Suspended' : 'Reinstated', $tenant->name),
+            subject: $tenant,
+            tenantId: $tenant->getKey(),
+            severity: AdminActivity::SEVERITY_CRITICAL,
+            reason: $validated['reason'] ?? null,
+            changes: ['from' => $before, 'to' => $validated['status']],
+        );
 
-        return back()->with('success', "Workspace {$validated['status']}.");
+        return back()->with('success', $validated['status'] === Tenant::STATUS_SUSPENDED
+            ? 'Workspace suspended. Their data is untouched.'
+            : 'Workspace reinstated.');
     }
 
     /**
@@ -99,15 +107,20 @@ class TenantController extends Controller
 
         $plan = Plan::findOrFail($validated['plan_id']);
 
+        $before = $this->planGate->subscriptionFor($tenant)?->plan?->name;
+
         $this->billing->activate($tenant, $plan, $this->billing->currencyFor($tenant), gateway: 'admin');
 
-        Log::warning('Admin changed workspace plan', [
-            'admin_id' => auth('admin')->id(),
-            'tenant_id' => $tenant->id,
-            'plan' => $plan->code,
-            'reason' => $validated['reason'] ?? null,
-        ]);
+        $this->activity->record(
+            action: 'tenant.change_plan',
+            description: sprintf('Moved “%s” from %s to %s at no charge', $tenant->name, $before ?? 'no plan', $plan->name),
+            subject: $tenant,
+            tenantId: $tenant->getKey(),
+            severity: AdminActivity::SEVERITY_CRITICAL,
+            reason: $validated['reason'] ?? null,
+            changes: ['from' => $before, 'to' => $plan->name],
+        );
 
-        return back()->with('success', "Workspace moved to {$plan->name}.");
+        return back()->with('success', "Workspace moved to {$plan->name} at no charge.");
     }
 }

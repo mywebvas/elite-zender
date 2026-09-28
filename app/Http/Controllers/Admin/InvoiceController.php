@@ -5,12 +5,13 @@ namespace App\Http\Controllers\Admin;
 use App\Billing\BillingService;
 use App\Billing\PaymentResult;
 use App\Http\Controllers\Controller;
+use App\Models\AdminActivity;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Platform\ActivityLogger;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -19,6 +20,7 @@ class InvoiceController extends Controller
 {
     public function __construct(
         private readonly BillingService $billing,
+        private readonly ActivityLogger $activity,
     ) {}
 
     public function index(Request $request): View
@@ -77,12 +79,15 @@ class InvoiceController extends Controller
             'paid_at' => now(),
         ])->save();
 
-        Log::warning('Admin confirmed a bank transfer', [
-            'admin_id' => auth('admin')->id(),
-            'payment_id' => $payment->getKey(),
-            'invoice' => $payment->invoice->number,
-            'amount' => $amount,
-        ]);
+        $this->activity->record(
+            action: 'payment.confirm_transfer',
+            description: sprintf('Confirmed a bank transfer of %s %s against %s', $payment->currency, number_format($amount / 100, 2), $payment->invoice->number),
+            subject: $payment,
+            tenantId: $payment->tenant_id,
+            severity: AdminActivity::SEVERITY_CRITICAL,
+            reason: $validated['note'] ?? null,
+            changes: ['amount' => $amount, 'invoice' => $payment->invoice->number],
+        );
 
         return back()->with('success', 'Transfer confirmed and invoice settled.');
     }
@@ -99,6 +104,15 @@ class InvoiceController extends Controller
             'reviewed_by' => auth('admin')->id(),
             'reviewed_at' => now(),
         ])->save();
+
+        $this->activity->record(
+            action: 'payment.reject_transfer',
+            description: 'Rejected a bank transfer',
+            subject: $payment,
+            tenantId: $payment->tenant_id,
+            severity: AdminActivity::SEVERITY_CRITICAL,
+            reason: $payment->failure_reason,
+        );
 
         return back()->with('success', 'Transfer rejected.');
     }
@@ -118,6 +132,15 @@ class InvoiceController extends Controller
                 'void_reason' => $request->string('reason')->toString(),
             ]),
         ])->save();
+
+        $this->activity->record(
+            action: 'invoice.void',
+            description: "Voided invoice {$invoice->number}",
+            subject: $invoice,
+            tenantId: $invoice->tenant_id,
+            severity: AdminActivity::SEVERITY_CRITICAL,
+            reason: $request->string('reason')->toString() ?: null,
+        );
 
         return back()->with('success', "Invoice {$invoice->number} voided.");
     }
@@ -165,12 +188,15 @@ class InvoiceController extends Controller
             $this->billing->settle($payment->invoice);
         }
 
-        Log::warning('Admin issued a refund', [
-            'admin_id' => auth('admin')->id(),
-            'payment_id' => $payment->getKey(),
-            'amount' => $validated['amount'],
-            'reason' => $validated['reason'],
-        ]);
+        $this->activity->record(
+            action: 'payment.refund',
+            description: sprintf('Refunded %s %s', $payment->currency, number_format($validated['amount'] / 100, 2)),
+            subject: $payment,
+            tenantId: $payment->tenant_id,
+            severity: AdminActivity::SEVERITY_CRITICAL,
+            reason: $validated['reason'],
+            changes: ['amount' => $validated['amount']],
+        );
 
         return back()->with('success', 'Refund recorded.');
     }

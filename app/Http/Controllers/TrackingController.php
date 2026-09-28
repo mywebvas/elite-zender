@@ -11,6 +11,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
+use Throwable;
 
 class TrackingController extends Controller
 {
@@ -28,6 +29,12 @@ class TrackingController extends Controller
                     'ip_address' => $request->ip(),
                     'user_agent' => mb_substr($request->userAgent() ?? '', 0, 500),
                 ],
+            );
+
+            $this->fireEngagementTrigger(
+                \App\Models\Automation::TRIGGER_CAMPAIGN_OPENED,
+                $campaign_id,
+                $contact_id,
             );
         });
 
@@ -66,9 +73,35 @@ class TrackingController extends Controller
                 'ip_address' => $request->ip(),
                 'user_agent' => mb_substr($request->userAgent() ?? '', 0, 500),
             ]);
+
+            $this->fireEngagementTrigger(
+                \App\Models\Automation::TRIGGER_CAMPAIGN_CLICKED,
+                $campaign_id,
+                $contact_id,
+            );
         });
 
         return redirect()->away($decodedUrl);
+    }
+
+    /**
+     * Enrol the contact into any automation watching this engagement.
+     *
+     * Wrapped so a misbehaving automation can never stop a tracking pixel from
+     * returning its GIF — the recipient's mail client is waiting on it.
+     */
+    private function fireEngagementTrigger(string $trigger, string $campaignId, string $contactId): void
+    {
+        try {
+            $contact = \App\Models\Contact::withoutGlobalScopes()->find($contactId);
+
+            if ($contact !== null) {
+                app(\App\Automations\AutomationEngine::class)
+                    ->trigger($trigger, $contact, ['campaign_id' => $campaignId]);
+            }
+        } catch (Throwable $e) {
+            report($e);
+        }
     }
 
     /**

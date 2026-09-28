@@ -65,6 +65,18 @@ class LeadCaptureController extends Controller
                 $contact->lists()->syncWithoutDetaching([$form->list_id]);
             }
 
+            // A signup form with no welcome email is a wasted first impression.
+            if ($contact->wasRecentlyCreated) {
+                $engine = app(\App\Automations\AutomationEngine::class);
+                $engine->trigger(\App\Models\Automation::TRIGGER_SUBSCRIBED, $contact);
+
+                if ($form->list_id !== null) {
+                    $engine->trigger(\App\Models\Automation::TRIGGER_LIST_JOINED, $contact, [
+                        'list_id' => $form->list_id,
+                    ]);
+                }
+            }
+
             return $contact;
         });
 

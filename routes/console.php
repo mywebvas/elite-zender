@@ -3,6 +3,7 @@
 use App\Console\Commands\FinaliseCampaigns;
 use App\Console\Commands\PurgeAuditLogs;
 use App\Console\Commands\ResetDailySmtpQuotas;
+use App\Console\Commands\RunAutomations;
 use App\Console\Commands\ScanBounces;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -28,6 +29,14 @@ Artisan::command('inspire', function (): void {
 
 Schedule::command(ResetDailySmtpQuotas::class)
     ->hourly()
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
+
+// Automations are the one job where lateness is visible to the recipient:
+// a "welcome" email an hour after signup reads as broken.
+Schedule::command(RunAutomations::class)
+    ->everyMinute()
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();

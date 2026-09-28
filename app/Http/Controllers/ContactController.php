@@ -68,6 +68,10 @@ class ContactController extends Controller
             'email' => $validated['email'],
             'first_name' => $validated['first_name'] ?? null,
             'last_name' => $validated['last_name'] ?? null,
+            // Set explicitly rather than relying on the column default: a
+            // database default is not reflected on the in-memory model, so
+            // everything downstream would read a missing status.
+            'status' => Contact::STATUS_ACTIVE,
         ]);
 
         if (! empty($validated['list_id'])) {
@@ -78,7 +82,35 @@ class ContactController extends Controller
             $contact->tags()->sync(Tag::idsForNames((string) $validated['tags']));
         }
 
+        $this->fireAutomationTriggers($contact, $validated);
+
         return redirect()->back()->with('success', 'Contact added successfully.');
+    }
+
+    /**
+     * Fire the triggers this contact's arrival satisfies.
+     *
+     * Done here rather than in a model observer so that bulk paths (the CSV
+     * importer) can opt out: enrolling 400k imported contacts into a welcome
+     * sequence is almost never what the operator meant, and there is no undo.
+     *
+     * @param  array<string, mixed>  $validated
+     */
+    private function fireAutomationTriggers(Contact $contact, array $validated): void
+    {
+        $engine = app(\App\Automations\AutomationEngine::class);
+
+        $engine->trigger(\App\Models\Automation::TRIGGER_SUBSCRIBED, $contact);
+
+        if (! empty($validated['list_id'])) {
+            $engine->trigger(\App\Models\Automation::TRIGGER_LIST_JOINED, $contact, [
+                'list_id' => $validated['list_id'],
+            ]);
+        }
+
+        foreach ($contact->tags as $tag) {
+            $engine->trigger(\App\Models\Automation::TRIGGER_TAG_ADDED, $contact, ['tag' => $tag->name]);
+        }
     }
 
     public function destroy(string $id): RedirectResponse

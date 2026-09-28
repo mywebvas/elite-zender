@@ -98,13 +98,36 @@ final class PlanGate
     /** Is the workspace entitled to send at all? */
     public function canSend(Tenant $tenant): bool
     {
+        return $this->sendBlockReason($tenant) === null;
+    }
+
+    /**
+     * Why sending is blocked, in words a customer can act on — or null when it
+     * is not blocked.
+     *
+     * Only the actions that cost money stop when billing lapses. The workspace
+     * keeps its data and its interface: blanket-403ing someone who is one click
+     * from paying is how you turn a late invoice into a cancellation.
+     */
+    public function sendBlockReason(Tenant $tenant): ?string
+    {
         $subscription = $this->subscriptionFor($tenant);
 
         if ($subscription !== null && ! $subscription->isUsable()) {
-            return false;
+            return 'Sending is paused while your subscription is unpaid. Settle the open invoice on the billing page and it resumes immediately.';
         }
 
-        return $this->allows($tenant, 'emails_per_month');
+        if (! $this->allows($tenant, 'emails_per_month')) {
+            $limit = $this->limitFor($tenant, 'emails_per_month');
+
+            return sprintf(
+                'You have used all %s emails included in your plan this month. Upgrade to keep sending — your allowance also resets on %s.',
+                number_format((int) $limit),
+                now()->endOfMonth()->addDay()->toFormattedDayDateString(),
+            );
+        }
+
+        return null;
     }
 
     /** Atomic monthly counter increment, called by the send workers. */

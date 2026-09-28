@@ -5,6 +5,7 @@ namespace App\Billing\Gateways;
 use App\Billing\CheckoutSession;
 use App\Billing\Contracts\PaymentGateway;
 use App\Billing\PaymentResult;
+use App\Billing\StoredCredential;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
@@ -68,6 +69,10 @@ final class StripeGateway implements PaymentGateway
                 'line_items[0][price_data][product_data][name]' => 'Invoice '.$invoice->number,
                 'metadata[invoice_id]' => $invoice->getKey(),
                 'metadata[tenant_id]' => $invoice->tenant_id,
+                // Ask Stripe to keep the card on file so the subscription can
+                // renew without dragging the customer back through checkout.
+                'payment_intent_data[setup_future_usage]' => 'off_session',
+                'customer_creation' => 'always',
             ]);
 
         if (! $response->successful()) {
@@ -166,6 +171,104 @@ final class StripeGateway implements PaymentGateway
             amount: (int) ($session['amount_total'] ?? 0),
             currency: strtoupper((string) ($session['currency'] ?? 'usd')),
             raw: $session,
+        );
+    }
+
+    public function supportsRecurring(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Charge a saved payment method without the customer present.
+     *
+     * `off_session` + `confirm` is the documented pattern for merchant-
+     * initiated renewals; a card that needs 3-D Secure will decline here with
+     * `authentication_required`, which is exactly what dunning should surface
+     * rather than silently swallow.
+     */
+    public function chargeStored(Invoice $invoice, StoredCredential $credential): PaymentResult
+    {
+        $reference = 'ezr_'.Str::lower(Str::random(24));
+
+        $response = Http::withToken((string) $this->config('secret_key'))
+            ->baseUrl((string) $this->config('base_url'))
+            ->asForm()
+            ->timeout(20)
+            ->post('/v1/payment_intents', array_filter([
+                'amount' => $invoice->balance(),
+                'currency' => strtolower($invoice->currency),
+                'customer' => $credential->customer,
+                'payment_method' => $credential->token,
+                'off_session' => 'true',
+                'confirm' => 'true',
+                'description' => 'Invoice '.$invoice->number,
+                'metadata[invoice_id]' => $invoice->getKey(),
+                'metadata[tenant_id]' => $invoice->tenant_id,
+            ], static fn ($value) => $value !== null));
+
+        $body = $response->json();
+
+        if (! $response->successful() || ($body['status'] ?? null) !== 'succeeded') {
+            return PaymentResult::failure(
+                $this->key(),
+                $body['error']['message'] ?? ($body['last_payment_error']['message'] ?? 'The card was declined.'),
+                $reference,
+                (array) $body,
+            );
+        }
+
+        return PaymentResult::success(
+            gateway: $this->key(),
+            gatewayRef: (string) $body['id'],
+            reference: $reference,
+            amount: (int) ($body['amount_received'] ?? $body['amount'] ?? 0),
+            currency: strtoupper((string) ($body['currency'] ?? 'usd')),
+            raw: (array) $body,
+        );
+    }
+
+    /**
+     * Resolve the reusable credential for a completed Checkout Session.
+     *
+     * The session only carries ids, so the payment method has to be fetched to
+     * learn the brand and last four — the two things a customer needs to
+     * recognise their own card on the billing page.
+     *
+     * @param  array<string, mixed>  $session
+     */
+    public function credentialFromSession(array $session): ?StoredCredential
+    {
+        $customer = $session['customer'] ?? null;
+        $intentId = $session['payment_intent'] ?? null;
+
+        if (! is_string($intentId) || $intentId === '') {
+            return null;
+        }
+
+        $intent = Http::withToken((string) $this->config('secret_key'))
+            ->baseUrl((string) $this->config('base_url'))
+            ->timeout(20)
+            ->get('/v1/payment_intents/'.$intentId)
+            ->json();
+
+        $paymentMethod = $intent['payment_method'] ?? null;
+
+        if (! is_string($paymentMethod) || $paymentMethod === '') {
+            return null;
+        }
+
+        $method = Http::withToken((string) $this->config('secret_key'))
+            ->baseUrl((string) $this->config('base_url'))
+            ->timeout(20)
+            ->get('/v1/payment_methods/'.$paymentMethod)
+            ->json();
+
+        return new StoredCredential(
+            token: $paymentMethod,
+            customer: is_string($customer) ? $customer : null,
+            brand: $method['card']['brand'] ?? null,
+            lastFour: $method['card']['last4'] ?? null,
         );
     }
 

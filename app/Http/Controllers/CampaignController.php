@@ -164,10 +164,8 @@ class CampaignController extends Controller
 
         $tenant = \App\Tenancy\TenantContext::tenant();
 
-        if ($tenant !== null && ! $planGate->canSend($tenant)) {
-            return back()->withErrors(
-                'Sending is paused: your plan\'s monthly limit is used up, or your subscription needs attention.',
-            );
+        if ($tenant !== null && ($blocked = $planGate->sendBlockReason($tenant)) !== null) {
+            return back()->withErrors($blocked);
         }
 
         if ($campaign->status !== Campaign::STATUS_DRAFT) {

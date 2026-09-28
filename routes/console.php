@@ -4,6 +4,7 @@ use App\Console\Commands\FinaliseCampaigns;
 use App\Console\Commands\PurgeAuditLogs;
 use App\Console\Commands\ResetDailySmtpQuotas;
 use App\Console\Commands\RunAutomations;
+use App\Console\Commands\RunBillingCycle;
 use App\Console\Commands\ScanBounces;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -48,6 +49,13 @@ Schedule::command(FinaliseCampaigns::class)
 
 Schedule::command(ScanBounces::class)
     ->everyFifteenMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// One daily pass, ordered: trials, renewals, dunning retries, lapses. Early
+// enough that a failed charge still leaves a working day for support to help.
+Schedule::command(RunBillingCycle::class)
+    ->dailyAt('02:30')
     ->withoutOverlapping()
     ->onOneServer();
 

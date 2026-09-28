@@ -29,9 +29,15 @@ class Invoice extends Model
 
     public const STATUS_UNCOLLECTIBLE = 'uncollectible';
 
+    public const REASON_MANUAL = 'manual';
+
+    public const REASON_RENEWAL = 'renewal';
+
+    public const REASON_UPGRADE = 'upgrade';
+
     /** @var list<string> */
     protected $fillable = [
-        'tenant_id', 'subscription_id', 'plan_id', 'number', 'status',
+        'tenant_id', 'subscription_id', 'plan_id', 'number', 'status', 'reason',
         'currency', 'subtotal', 'tax', 'total', 'amount_paid',
         'period_start', 'period_end', 'due_at', 'paid_at', 'voided_at',
         'line_items', 'metadata',

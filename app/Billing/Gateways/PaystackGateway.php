@@ -5,6 +5,7 @@ namespace App\Billing\Gateways;
 use App\Billing\CheckoutSession;
 use App\Billing\Contracts\PaymentGateway;
 use App\Billing\PaymentResult;
+use App\Billing\StoredCredential;
 use App\Models\Invoice;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Request;
@@ -158,6 +159,87 @@ final class PaystackGateway implements PaymentGateway
             currency: strtoupper((string) ($data['currency'] ?? 'NGN')),
             raw: $data,
         );
+    }
+
+    public function supportsRecurring(): bool
+    {
+        return true;
+    }
+
+    /**
+     * Re-charge a saved authorization.
+     *
+     * Paystack returns `authorization.authorization_code` on the first
+     * successful charge and it stays valid for that card; this is the endpoint
+     * the customer never has to see again.
+     */
+    public function chargeStored(Invoice $invoice, StoredCredential $credential): PaymentResult
+    {
+        $reference = 'ezr_'.Str::lower(Str::random(24));
+
+        try {
+            $response = $this->client()->post('/transaction/charge_authorization', [
+                'authorization_code' => $credential->token,
+                'email' => $credential->customer ?? $this->billingEmail($invoice),
+                'amount' => $invoice->balance(),
+                'currency' => strtoupper($invoice->currency),
+                'reference' => $reference,
+                'metadata' => [
+                    'invoice_id' => $invoice->getKey(),
+                    'tenant_id' => $invoice->tenant_id,
+                    'reason' => 'renewal',
+                ],
+            ]);
+        } catch (ConnectionException $e) {
+            return PaymentResult::failure($this->key(), 'Could not reach Paystack: '.$e->getMessage(), $reference);
+        }
+
+        $body = $response->json();
+        $data = $body['data'] ?? [];
+
+        if (! $response->successful() || ($data['status'] ?? null) !== 'success') {
+            return PaymentResult::failure(
+                $this->key(),
+                $data['gateway_response'] ?? ($body['message'] ?? 'The card was declined.'),
+                $reference,
+                (array) $data,
+            );
+        }
+
+        return PaymentResult::success(
+            gateway: $this->key(),
+            gatewayRef: (string) ($data['id'] ?? $reference),
+            reference: $reference,
+            amount: (int) ($data['amount'] ?? 0),
+            currency: strtoupper((string) ($data['currency'] ?? 'NGN')),
+            raw: (array) $data,
+        );
+    }
+
+    /**
+     * Pull the reusable credential out of a completed charge, if the customer's
+     * card can be charged again.
+     *
+     * @param  array<string, mixed>  $raw
+     */
+    public static function credentialFrom(array $raw): ?StoredCredential
+    {
+        $authorization = $raw['authorization'] ?? null;
+
+        if (! is_array($authorization) || ($authorization['reusable'] ?? false) !== true) {
+            return null;
+        }
+
+        $code = $authorization['authorization_code'] ?? null;
+
+        return is_string($code) && $code !== ''
+            ? new StoredCredential(
+                token: $code,
+                customer: $raw['customer']['email'] ?? null,
+                brand: $authorization['brand'] ?? null,
+                lastFour: $authorization['last4'] ?? null,
+            )
+            : null;
     }
 
     private function client(): \Illuminate\Http\Client\PendingRequest

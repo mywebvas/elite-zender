@@ -97,6 +97,9 @@ Route::middleware(['auth:web'])->group(function (): void {
     Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
     Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
     Route::post('/billing/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
+    Route::post('/billing/resume', [BillingController::class, 'resume'])->name('billing.resume');
+    Route::post('/billing/keep-plan', [BillingController::class, 'keepPlan'])->name('billing.keep-plan');
+    Route::delete('/billing/card', [BillingController::class, 'forgetCard'])->name('billing.card.forget');
     Route::get('/billing/invoices/{invoice}', [BillingController::class, 'showInvoice'])->name('billing.invoices.show');
     Route::post('/billing/invoices/{invoice}/checkout', [CheckoutController::class, 'start'])->name('billing.checkout.start');
     Route::get('/billing/invoices/{invoice}/callback', [CheckoutController::class, 'callback'])->name('billing.checkout.callback');

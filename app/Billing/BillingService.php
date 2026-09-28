@@ -2,6 +2,8 @@
 
 namespace App\Billing;
 
+use App\Billing\Gateways\PaystackGateway;
+use App\Billing\Gateways\StripeGateway;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Plan;
@@ -10,6 +12,7 @@ use App\Models\Tenant;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use RuntimeException;
+use Throwable;
 
 /**
  * The money state machine: subscribe, invoice, record payment, activate.
@@ -160,7 +163,12 @@ final class BillingService
                 'payload' => $result->raw,
             ]);
 
+            // Order matters: settle() is what creates the subscription on a
+            // first purchase, and there is nothing to attach a card to before
+            // it exists. Getting this backwards meant the very first renewal
+            // failed for every new customer.
             $this->settle($invoice);
+            $this->rememberCredential($invoice, $result);
 
             return $payment;
         });
@@ -229,9 +237,346 @@ final class BillingService
         $subscription->forceFill([
             'cancel_at' => $subscription->current_period_end ?? now(),
             'canceled_at' => now(),
+            'pending_plan_id' => null,
         ])->save();
 
         return $subscription;
+    }
+
+    /**
+     * Undo a scheduled cancellation.
+     *
+     * One click, no re-entry of card details, no new invoice: the period the
+     * customer already paid for simply keeps running. Making someone re-subscribe
+     * from scratch to undo a mis-click is how you turn a save into a churn.
+     */
+    public function resume(Subscription $subscription): Subscription
+    {
+        $subscription->forceFill([
+            'cancel_at' => null,
+            'canceled_at' => null,
+            'status' => $subscription->status === Subscription::STATUS_CANCELED
+                ? Subscription::STATUS_ACTIVE
+                : $subscription->status,
+        ])->save();
+
+        return $subscription;
+    }
+
+    /**
+     * Move between paid plans mid-cycle.
+     *
+     * Upgrades take effect immediately and are invoiced for the *unused* part
+     * of the period only — charging a full month for six remaining days is the
+     * kind of thing customers notice once and never forgive. Downgrades are
+     * scheduled for period end, because the capacity has already been bought.
+     *
+     * @return Invoice|null an invoice when money is owed now, otherwise null
+     */
+    public function changePlan(Tenant $tenant, Plan $target): ?Invoice
+    {
+        $subscription = Subscription::withoutGlobalScopes()->firstWhere('tenant_id', $tenant->getKey());
+
+        if ($subscription === null) {
+            return $this->invoiceForPlan($tenant, $target);
+        }
+
+        if ($target->isQuoteOnly()) {
+            throw new RuntimeException('This plan is quoted — please contact sales.');
+        }
+
+        $currency = $subscription->currency;
+        $currentPrice = $subscription->amount;
+        $targetPrice = $target->priceFor($currency) ?? 0;
+
+        // Same price, or moving to something cheaper: schedule it, do not bill.
+        if ($targetPrice <= $currentPrice) {
+            $subscription->forceFill([
+                'pending_plan_id' => $target->getKey() === $subscription->plan_id ? null : $target->getKey(),
+            ])->save();
+
+            if ($targetPrice === 0 && $currentPrice === 0) {
+                $this->activate($tenant, $target, $currency, $subscription->gateway);
+            }
+
+            return null;
+        }
+
+        $amount = $this->prorate($subscription, $targetPrice);
+
+        if ($amount <= 0) {
+            $this->activate($tenant, $target, $currency, $subscription->gateway);
+
+            return null;
+        }
+
+        return DB::transaction(fn (): Invoice => Invoice::withoutGlobalScopes()->create([
+            'tenant_id' => $tenant->getKey(),
+            'subscription_id' => $subscription->getKey(),
+            'plan_id' => $target->getKey(),
+            'number' => Invoice::nextNumber(),
+            'status' => Invoice::STATUS_OPEN,
+            'reason' => Invoice::REASON_UPGRADE,
+            'currency' => $currency,
+            'subtotal' => $amount,
+            'tax' => 0,
+            'total' => $amount,
+            'period_start' => now(),
+            'period_end' => $subscription->current_period_end ?? now()->addMonth(),
+            'due_at' => now()->addDays(3),
+            'line_items' => [[
+                'description' => sprintf(
+                    'Upgrade to %s — prorated for the remaining %d day(s) of this period',
+                    $target->name,
+                    $this->daysRemaining($subscription),
+                ),
+                'quantity' => 1,
+                'unit_amount' => $amount,
+                'amount' => $amount,
+            ]],
+        ]));
+    }
+
+    /**
+     * The difference in price for the unused part of the current period.
+     *
+     * Rounded down deliberately: when the arithmetic is ambiguous, the rounding
+     * error should land in the customer's favour.
+     */
+    public function prorate(Subscription $subscription, int $targetPrice): int
+    {
+        $remaining = $this->daysRemaining($subscription);
+        $periodDays = max(1, (int) ($subscription->current_period_start?->diffInDays($subscription->current_period_end) ?: 30));
+
+        $difference = $targetPrice - $subscription->amount;
+
+        return (int) floor($difference * min($remaining, $periodDays) / $periodDays);
+    }
+
+    private function daysRemaining(Subscription $subscription): int
+    {
+        if ($subscription->current_period_end === null) {
+            return 0;
+        }
+
+        return max(0, (int) ceil(now()->diffInDays($subscription->current_period_end, absolute: false)));
+    }
+
+    /**
+     * Raise the invoice for the next period.
+     *
+     * Separate from charging it: an invoice exists whether or not a card is on
+     * file, which is what makes offline payers first-class rather than an
+     * afterthought.
+     */
+    public function invoiceRenewal(Subscription $subscription): ?Invoice
+    {
+        $plan = $subscription->pendingPlan ?? $subscription->plan;
+
+        if ($plan === null) {
+            return null;
+        }
+
+        $price = $plan->priceFor($subscription->currency) ?? 0;
+
+        if ($price === 0) {
+            // Free plans just roll over.
+            $this->rollPeriod($subscription, $plan, $price);
+
+            return null;
+        }
+
+        return DB::transaction(function () use ($subscription, $plan, $price): Invoice {
+            return Invoice::withoutGlobalScopes()->create([
+                'tenant_id' => $subscription->tenant_id,
+                'subscription_id' => $subscription->getKey(),
+                'plan_id' => $plan->getKey(),
+                'number' => Invoice::nextNumber(),
+                'status' => Invoice::STATUS_OPEN,
+                'reason' => Invoice::REASON_RENEWAL,
+                'currency' => $subscription->currency,
+                'subtotal' => $price,
+                'tax' => 0,
+                'total' => $price,
+                'period_start' => $subscription->current_period_end ?? now(),
+                'period_end' => ($subscription->current_period_end ?? now())->copy()->addMonth(),
+                'due_at' => now()->addDays((int) config('billing.grace_days', 7)),
+                'line_items' => [[
+                    'description' => "{$plan->name} plan — 1 month",
+                    'quantity' => 1,
+                    'unit_amount' => $price,
+                    'amount' => $price,
+                ]],
+            ]);
+        });
+    }
+
+    /**
+     * Attempt the stored-card charge for a renewal invoice.
+     *
+     * Returns true when the money landed. A failure is never fatal here: the
+     * invoice stays open and dunning takes over.
+     */
+    public function attemptAutoCharge(Subscription $subscription, Invoice $invoice): bool
+    {
+        $credential = StoredCredential::fromSubscription($subscription);
+
+        if ($credential === null || $subscription->gateway === null || ! $this->gateways->has($subscription->gateway)) {
+            return false;
+        }
+
+        $gateway = $this->gateways->get($subscription->gateway);
+
+        if (! $gateway->supportsRecurring() || ! $gateway->isConfigured()) {
+            return false;
+        }
+
+        try {
+            $result = $gateway->chargeStored($invoice, $credential);
+        } catch (Throwable $e) {
+            report($e);
+
+            return false;
+        }
+
+        if (! $result->successful) {
+            $this->recordDunningFailure($subscription, $invoice, $result->failureReason);
+
+            return false;
+        }
+
+        $this->recordPayment($invoice, $result);
+
+        $subscription->forceFill(['dunning_attempts' => 0, 'next_retry_at' => null])->save();
+
+        return true;
+    }
+
+    /**
+     * Log a failed renewal and schedule the next attempt.
+     *
+     * The schedule widens (1, 3, then 5 days) because an immediate retry on a
+     * declined card almost always declines again, and each attempt can cost the
+     * customer a bank notification.
+     */
+    public function recordDunningFailure(Subscription $subscription, Invoice $invoice, ?string $reason): void
+    {
+        $attempts = $subscription->dunning_attempts + 1;
+
+        $schedule = [1, 3, 5];
+        $next = $schedule[$attempts - 1] ?? null;
+
+        $subscription->forceFill([
+            'status' => Subscription::STATUS_PAST_DUE,
+            'dunning_attempts' => $attempts,
+            'next_retry_at' => $next === null ? null : now()->addDays($next),
+        ])->save();
+
+        Payment::withoutGlobalScopes()->create([
+            'tenant_id' => $invoice->tenant_id,
+            'invoice_id' => $invoice->getKey(),
+            'gateway' => (string) $subscription->gateway,
+            'reference' => 'dunning_'.$attempts.'_'.$invoice->getKey(),
+            'status' => Payment::STATUS_FAILED,
+            'currency' => $invoice->currency,
+            'amount' => 0,
+            'failure_reason' => $reason ?? 'The card was declined.',
+        ]);
+
+        Log::warning('Renewal charge failed', [
+            'tenant_id' => $subscription->tenant_id,
+            'invoice' => $invoice->number,
+            'attempt' => $attempts,
+            'reason' => $reason,
+        ]);
+    }
+
+    /** Move the subscription into its next period. */
+    public function rollPeriod(Subscription $subscription, Plan $plan, int $amount): Subscription
+    {
+        $start = $subscription->current_period_end ?? now();
+
+        $subscription->forceFill([
+            'plan_id' => $plan->getKey(),
+            'pending_plan_id' => null,
+            'status' => Subscription::STATUS_ACTIVE,
+            'amount' => $amount,
+            'current_period_start' => $start,
+            // Anchored to the previous period end, not to "now": renewing a day
+            // late must not quietly shift the customer's billing date.
+            'current_period_end' => $start->copy()->addMonth(),
+            'dunning_attempts' => 0,
+            'next_retry_at' => null,
+        ])->save();
+
+        return $subscription;
+    }
+
+    /**
+     * Stop the workspace when an invoice has gone unpaid past the grace window.
+     *
+     * Access is suspended, never deleted — a customer who pays a week late
+     * should find everything exactly as they left it.
+     */
+    public function lapse(Subscription $subscription): void
+    {
+        $subscription->forceFill([
+            'status' => Subscription::STATUS_EXPIRED,
+            'next_retry_at' => null,
+        ])->save();
+
+        Log::warning('Subscription lapsed after the grace window', [
+            'tenant_id' => $subscription->tenant_id,
+        ]);
+    }
+
+    /** Persist a reusable credential so the next renewal needs no interaction. */
+    private function rememberCredential(Invoice $invoice, PaymentResult $result): void
+    {
+        $subscription = Subscription::withoutGlobalScopes()->firstWhere('tenant_id', $invoice->tenant_id);
+
+        if ($subscription === null) {
+            return;
+        }
+
+        $credential = match ($result->gateway) {
+            'paystack' => PaystackGateway::credentialFrom($result->raw),
+            'stripe' => $this->gateways->has('stripe')
+                ? $this->stripeCredential($result)
+                : null,
+            default => null,
+        };
+
+        if ($credential === null) {
+            return;
+        }
+
+        $subscription->forceFill([
+            'gateway' => $result->gateway,
+            'gateway_token' => $credential->token,
+            'gateway_customer' => $credential->customer,
+            'card_brand' => $credential->brand,
+            'card_last_four' => $credential->lastFour,
+        ])->save();
+    }
+
+    private function stripeCredential(PaymentResult $result): ?StoredCredential
+    {
+        $gateway = $this->gateways->get('stripe');
+
+        if (! $gateway instanceof StripeGateway) {
+            return null;
+        }
+
+        try {
+            return $gateway->credentialFromSession($result->raw);
+        } catch (Throwable $e) {
+            // Losing the card on file is a degraded renewal, not a failed
+            // payment — never let it roll back the money we just took.
+            report($e);
+
+            return null;
+        }
     }
 
     public function gateways(): PaymentGatewayManager

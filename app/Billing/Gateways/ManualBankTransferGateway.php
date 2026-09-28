@@ -5,6 +5,7 @@ namespace App\Billing\Gateways;
 use App\Billing\CheckoutSession;
 use App\Billing\Contracts\PaymentGateway;
 use App\Billing\PaymentResult;
+use App\Billing\StoredCredential;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
 
@@ -100,6 +101,23 @@ final class ManualBankTransferGateway implements PaymentGateway
     public function parseWebhook(Request $request): ?PaymentResult
     {
         return null;
+    }
+
+    /**
+     * There is nothing to re-charge: a renewal on this rail means issuing an
+     * invoice and asking the customer to transfer again.
+     */
+    public function supportsRecurring(): bool
+    {
+        return false;
+    }
+
+    public function chargeStored(Invoice $invoice, StoredCredential $credential): PaymentResult
+    {
+        return PaymentResult::failure(
+            $this->key(),
+            'Bank transfers cannot be charged automatically.',
+        );
     }
 
     /** @return array<string, string> */

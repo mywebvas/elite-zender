@@ -4,6 +4,7 @@ namespace App\Billing\Contracts;
 
 use App\Billing\CheckoutSession;
 use App\Billing\PaymentResult;
+use App\Billing\StoredCredential;
 use App\Models\Invoice;
 use Illuminate\Http\Request;
 
@@ -40,4 +41,19 @@ interface PaymentGateway
 
     /** Translate a verified webhook into a normalised result, or null if irrelevant. */
     public function parseWebhook(Request $request): ?PaymentResult;
+
+    /**
+     * Can this rail charge again later without the customer present?
+     *
+     * Offline bank transfer cannot, which is why renewal has to fall back to
+     * issuing an invoice and asking.
+     */
+    public function supportsRecurring(): bool;
+
+    /**
+     * Charge a stored credential off-session.
+     *
+     * Only ever called with a token this gateway itself returned.
+     */
+    public function chargeStored(Invoice $invoice, StoredCredential $credential): PaymentResult;
 }

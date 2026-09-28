@@ -2,6 +2,7 @@
 
 namespace App\Http\Middleware;
 
+use App\Billing\PlanGate;
 use App\Models\Tenant;
 use App\Tenancy\TenantCache;
 use App\Tenancy\TenantContext;
@@ -16,6 +17,53 @@ use Symfony\Component\HttpFoundation\Response;
  */
 class ResolveTenant
 {
+    /**
+     * Publish the workspace's billing state to every view.
+     *
+     * One resolution per request, shared — otherwise each page re-queries the
+     * subscription to decide whether to show a banner, and they drift.
+     */
+    private function shareBillingState(?Tenant $tenant): void
+    {
+        if ($tenant === null) {
+            \Illuminate\Support\Facades\View::share('billingNotice', null);
+
+            return;
+        }
+
+        $planGate = app(PlanGate::class);
+        $subscription = $planGate->subscriptionFor($tenant);
+
+        \Illuminate\Support\Facades\View::share('billingNotice', match (true) {
+            $subscription === null => null,
+
+            $subscription->status === \App\Models\Subscription::STATUS_EXPIRED => [
+                'tone' => 'danger',
+                'message' => 'Your subscription has lapsed and sending is paused. Your data is untouched — settle the open invoice to pick up where you left off.',
+            ],
+
+            $subscription->status === \App\Models\Subscription::STATUS_PAST_DUE => [
+                'tone' => 'warning',
+                'message' => 'We could not collect your last payment. Sending continues for now; please settle the open invoice to avoid interruption.',
+            ],
+
+            $subscription->isEnding() => [
+                'tone' => 'info',
+                'message' => sprintf(
+                    'Your plan ends on %s. You can undo this any time before then.',
+                    $subscription->cancel_at?->toFormattedDayDateString() ?? 'the end of the period',
+                ),
+            ],
+
+            $subscription->onTrial() && $subscription->trial_ends_at->diffInDays(now()) >= -3 => [
+                'tone' => 'info',
+                'message' => sprintf('Your trial ends %s. Add a payment method to keep everything running.', $subscription->trial_ends_at->diffForHumans()),
+            ],
+
+            default => null,
+        });
+    }
+
     public function handle(Request $request, Closure $next): Response
     {
         // The operator console is cross-tenant by design and must never be
@@ -56,9 +104,10 @@ class ResolveTenant
             }
         }
 
-        return TenantContext::run($tenant, fn () => TenantCache::withNamespace(
-            $tenant,
-            fn () => $next($request),
-        ));
+        return TenantContext::run($tenant, fn () => TenantCache::withNamespace($tenant, function () use ($next, $request, $tenant) {
+            $this->shareBillingState($tenant);
+
+            return $next($request);
+        }));
     }
 }

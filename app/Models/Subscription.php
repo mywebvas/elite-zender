@@ -18,6 +18,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property int $amount
  * @property \Illuminate\Support\Carbon|null $trial_ends_at
  * @property \Illuminate\Support\Carbon|null $current_period_end
+ * @property string|null $gateway_token
+ * @property string|null $gateway_customer
+ * @property int $dunning_attempts
  */
 class Subscription extends Model
 {
@@ -35,15 +38,50 @@ class Subscription extends Model
 
     /** @var list<string> */
     protected $fillable = [
-        'tenant_id', 'plan_id', 'status', 'currency', 'amount', 'interval',
+        'tenant_id', 'plan_id', 'pending_plan_id', 'status', 'currency', 'amount', 'interval',
         'trial_ends_at', 'current_period_start', 'current_period_end',
         'cancel_at', 'canceled_at', 'gateway', 'gateway_ref',
+        'gateway_customer', 'gateway_token', 'card_brand', 'card_last_four',
+        'dunning_attempts', 'next_retry_at',
     ];
+
+    /** Bearer credentials against the customer's card — never serialise them. */
+    protected $hidden = ['gateway_token', 'gateway_customer'];
 
     /** @return BelongsTo<Plan, $this> */
     public function plan(): BelongsTo
     {
         return $this->belongsTo(Plan::class);
+    }
+
+    /**
+     * The plan a scheduled downgrade will apply at period end.
+     *
+     * @return BelongsTo<Plan, $this>
+     */
+    public function pendingPlan(): BelongsTo
+    {
+        return $this->belongsTo(Plan::class, 'pending_plan_id');
+    }
+
+    /** Can this subscription renew itself without the customer returning? */
+    public function canAutoRenew(): bool
+    {
+        return filled($this->gateway_token)
+            && $this->canceled_at === null
+            && $this->amount > 0;
+    }
+
+    /** Is a cancellation scheduled but not yet in effect? */
+    public function isEnding(): bool
+    {
+        return $this->canceled_at !== null
+            && ($this->cancel_at === null || $this->cancel_at->isFuture());
+    }
+
+    public function isDue(): bool
+    {
+        return $this->current_period_end !== null && $this->current_period_end->isPast();
     }
 
     /** @return BelongsTo<Tenant, $this> */
@@ -98,6 +136,12 @@ class Subscription extends Model
             'current_period_end' => 'datetime',
             'cancel_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'next_retry_at' => 'datetime',
+            'dunning_attempts' => 'integer',
+            // Encrypted at rest: a leaked database row must not be a means of
+            // charging the customer's card.
+            'gateway_token' => 'encrypted',
+            'gateway_customer' => 'encrypted',
         ];
     }
 }

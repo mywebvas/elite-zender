@@ -1,4 +1,4 @@
-﻿<x-layouts.app header="Automations">
+<x-layouts.app header="Automations">
 
 <div class="page-header">
     <div>

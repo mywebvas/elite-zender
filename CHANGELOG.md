@@ -78,6 +78,48 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - `TenantContext::run()` restores the previous tenant in a `finally`, removing
   the context leaks in jobs and tracking endpoints.
 
+### Fixed — second pass (red-team review)
+
+- **Password reset and the two-factor challenge were unreachable.** Four
+  Fortify features were enabled with no view bound, so `/forgot-password`,
+  `/reset-password`, `/two-factor-challenge` and `/user/confirm-password` all
+  returned 500. Enabling 2FA locked a user out of their own workspace. The
+  login form's "Forgot password?" link was a dead `#` that popped a toast
+  claiming the feature did not exist.
+- `/onboarding` returned 500: `:disabled="testingSmtp"` on a Blade component is
+  evaluated as PHP, so the Alpine identifier parsed as an undefined constant.
+- `/settings` returned 500 reading a two-factor attribute the model had not
+  loaded; `campaigns/show` referenced `from_name`/`from_email`, columns that do
+  not exist on `campaigns`.
+- `trustProxies(at: '*')` trusted `X-Forwarded-For` from any client — forgeable
+  source IPs, defeating every IP-keyed limit and poisoning the audit trail.
+- `config/octane.php` had an empty `flush` list while the tenant is bound as a
+  container instance, so it could outlive a request and scope the next one.
+- The layout loaded Turbo from a CDN that the CSP blocked; Turbo never ran.
+- `manifest.json` referenced three icon files that did not exist.
+- Eight files carried a UTF-8 BOM, including Blade templates where it emits
+  stray bytes before `<!DOCTYPE`. `.gitattributes` now enforces LF and no BOM.
+- Flashed validation errors were never rendered, so a refused action (e.g.
+  "only draft campaigns can be sent") looked like a silent no-op.
+
+### Added — second pass
+
+- `config/cors.php` (the framework default allowed `*` on every `api/*` path)
+  plus a separate credential-free policy for the embeddable capture endpoint,
+  which previously had no CORS at all and therefore could not be embedded.
+- Rate limiters on password reset and registration; content-negotiated throttle
+  responses.
+- `tests/Feature/SmokeTest.php` — renders every page for a signed-in owner;
+  it found four of the 500s above on its first run.
+- `tests/Architecture/` — rules encoding each defect class (no `env()` outside
+  config, no debug helpers, jobs are queued, services are final, …).
+- Structured JSON logging with a tenant/user/request processor.
+- A two-workspace seeder: with one tenant, a missing `where tenant_id = ?`
+  looks exactly like a correct query.
+- `/sitemap.xml`, `<x-seo>` (canonical, Open Graph, Twitter card, JSON-LD),
+  skip links on both shells.
+- `deploy/README.md`; rewritten nginx and supervisor configs.
+
 ### Security
 
 - Cross-tenant write via `Api\LeadCaptureController` (`tenant_id` was read

@@ -1,4 +1,4 @@
-﻿@props(['title' => '', 'size' => 'md'])
+@props(['title' => '', 'size' => 'md'])
 @php
 $maxw = ['sm'=>'sm:max-w-sm','md'=>'sm:max-w-lg','lg'=>'sm:max-w-2xl','xl'=>'sm:max-w-4xl'][$size] ?? 'sm:max-w-lg';
 @endphp

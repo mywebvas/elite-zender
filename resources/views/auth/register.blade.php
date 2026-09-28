@@ -1,4 +1,4 @@
-﻿<x-layouts.guest header="Create your account" subheader="Join 2,400+ marketers who own their email infrastructure">
+<x-layouts.guest header="Create your account" subheader="Join 2,400+ marketers who own their email infrastructure">
     <form method="POST" action="{{ route('register') }}" class="space-y-5"
           x-data="{ loading: false, password: '', strength: 0, getStrength() {
               let s = 0;

@@ -1,4 +1,4 @@
-﻿<x-layouts.app header="Campaign Overview">
+<x-layouts.app header="Campaign Overview">
 
     <div class="page-header">
         <div>

@@ -45,6 +45,12 @@
 
 <body class="h-full bg-slate-50 dark:bg-slate-950 font-sans antialiased">
 
+    {{-- Keyboard users must be able to jump past the sidebar and top bar. --}}
+    <a href="#main-content"
+       class="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-3 focus:left-3 focus:rounded-lg focus:bg-indigo-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">
+        Skip to main content
+    </a>
+
     {{-- ================================================================
          DESKTOP SIDEBAR + MAIN LAYOUT
          Sidebar: always visible lg+; collapses to icon-rail when sidebarOpen=false

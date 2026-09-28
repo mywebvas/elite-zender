@@ -70,3 +70,30 @@ it('shows an honest empty state for a brand new workspace', function (): void {
         ->assertSee('No campaigns yet')
         ->assertSee('None configured');
 });
+
+it('surfaces flashed validation errors to the user', function (): void {
+    $campaign = Campaign::factory()->create([
+        'tenant_id' => $this->user->tenant_id,
+        'status' => Campaign::STATUS_SENDING,
+    ]);
+
+    // Controllers reject invalid actions with withErrors(); nothing in the
+    // layout rendered $errors, so a refused action looked like a no-op.
+    $this->from(route('campaigns.show', $campaign))
+        ->post(route('campaigns.dispatch', $campaign))
+        ->assertRedirect(route('campaigns.show', $campaign))
+        ->assertSessionHasErrors();
+
+    $this->followingRedirects()
+        ->from(route('campaigns.show', $campaign))
+        ->post(route('campaigns.dispatch', $campaign))
+        ->assertOk()
+        ->assertSee('Only draft campaigns can be sent.', escape: false);
+});
+
+it('offers a skip link on the authenticated shell', function (): void {
+    $this->get(route('dashboard'))
+        ->assertOk()
+        ->assertSee('Skip to main content')
+        ->assertSee('id="main-content"', escape: false);
+});

@@ -81,3 +81,40 @@ All decisions below are locked. Any change requires an ADR (`docs/adr/`) and doc
 2. Update affected documents (keep decision log in sync)
 3. Cross-check: versions, pricing, UUID v7, Redis strategy must be consistent everywhere
 4. PR with summary of changed decisions (if any — requires ADR)
+
+---
+
+## Addendum — implementation audit (2026-09-28)
+
+A full audit was run against this decision log. The decisions below were
+documented but **not implemented**; each is now either built or explicitly
+re-scoped. Nothing in the locked list above changed.
+
+| # | Decision | Audit finding | Status |
+| --- | --- | --- | --- |
+| 3 | Laravel 13 / PHP 8.5 | `composer.json` declared `^8.3` while the lock pinned Symfony 8 (needs ≥ 8.4.1). CI and the Docker image could not install. | Floor raised to `^8.4`; CI matrix runs 8.4 and 8.5. |
+| 4 | PostgreSQL 17 | Five tables used bigint keys against uuid parents — valid on SQLite, rejected by PostgreSQL. | Migrations corrected; CI now migrates and rolls back against `postgres:17`. |
+| 5/6 | Redis 7, per-tenant key prefix `t:{uuid7_short}:` | Implemented as `Redis::setPrefix()`, which does not exist. The resulting exception was swallowed by an empty `catch`, so the control was a no-op and tenants shared cache keys. | Replaced by `App\Tenancy\TenantCache`, which namespaces the cache store and restores it in a `finally`. |
+| 9 | Bank-grade security | No policies, no RBAC, `authorize()` always true, unsigned unsubscribe links, `tenant_id` accepted from a request body, `trustProxies(at: '*')`. | Policy layer, role hierarchy, signed opt-out links, capability-keyed capture forms, configurable proxy trust. |
+| 10 | Local-first testing (Pint + PHPStan 9 + Pest) | Neither Pint nor PHPStan was configured or run anywhere; CI ran neither. | `pint.json` and `phpstan.neon` added; PHPStan is clean at level 6 and enforced in CI. |
+
+### Deviations from `docs/08-MIGRATION-PLAN.md`
+
+| Planned artefact | Outcome |
+| --- | --- |
+| `SmtpPool::nextAccount()` health-weighted rotation | Built as `App\Services\SmtpPool`, deterministic so a replayed chunk distributes identically. |
+| Seeded-per-recipient spin syntax | Built; `SpinSyntaxService::compile()` takes a seed. |
+| `suppression_entries` hash-only table | Built, keyed HMAC-SHA256 so opt-outs survive GDPR erasure. |
+| `App\Actions\*` invokables | **Not adopted.** The logic lives in `app/Services` with the same boundaries. Introducing a second convention mid-audit would have been churn, not clarity. |
+| Horizon lanes high/default/low | Lanes exist and jobs declare them; **Horizon itself is not installed** (it is not in the lock file, and packages cannot be added without a dependency-resolution pass). Supervisor runs the lanes directly. |
+
+### Known gaps, tracked openly
+
+1. **Automations do not execute.** The builder, schema and step allow-list are
+   real; there is no runtime engine walking `contact_automations`. This is the
+   largest remaining feature gap.
+2. **No scoped API tokens.** A Sanctum token carries its owner's full rights.
+3. **No per-tenant encryption key.** All workspaces share `APP_KEY`.
+4. **Billing is not integrated.** Plan tiers exist only as rate-limit inputs.
+5. **`'unsafe-eval'` remains in the CSP** because Alpine compiles `x-*`
+   expressions at runtime. Removing it means adopting Alpine's CSP build.

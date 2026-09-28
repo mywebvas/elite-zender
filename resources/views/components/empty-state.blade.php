@@ -35,7 +35,7 @@
 
     {{-- CTA slot --}}
     @if($slot->isNotEmpty())
-        <div class="mt-{{ $body ? '0' : '6' }}">
+        <div class="{{ $body ? 'mt-0' : 'mt-6' }}">
             {{ $slot }}
         </div>
     @endif

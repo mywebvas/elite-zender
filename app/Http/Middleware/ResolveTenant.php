@@ -33,6 +33,13 @@ class ResolveTenant
             }
         }
 
-        return $next($request);
+        try {
+            return $next($request);
+        } finally {
+            TenantContext::set(null);
+            try {
+                Redis::setPrefix(config('database.redis.options.prefix'));
+            } catch (\Throwable) {}
+        }
     }
 }

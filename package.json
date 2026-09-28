@@ -17,6 +17,9 @@
         "@laravel/multiplex": "^0.4.1"
     },
     "dependencies": {
-        "alpinejs": "^3.17.3"
+        "@alpinejs/intersect": "^3.17.3",
+        "@tailwindcss/typography": "^0.5.20",
+        "alpinejs": "^3.17.3",
+        "quill": "^2.0.3"
     }
 }

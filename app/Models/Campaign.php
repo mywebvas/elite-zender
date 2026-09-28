@@ -27,6 +27,16 @@ class Campaign extends Model
         return $this->belongsToMany(SmtpAccount::class);
     }
 
+    public function events(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(CampaignEvent::class);
+    }
+
+    public function list(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(ContactList::class, 'list_id');
+    }
+
     protected function casts(): array
     {
         return [

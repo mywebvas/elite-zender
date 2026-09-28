@@ -1,110 +1,84 @@
-{{--
-    x-toast — Global toast stack
-    Position: top-center mobile, bottom-right desktop (docs/07-PWA-SPEC.md §4.1)
-    Max 3 visible; success auto-dismisses after 3s; error persists until dismissed.
-
-    Usage:
-        window.$toast('Message here')                    // success (auto-dismiss)
-        window.$toast('Error!', 'error')                 // error (persists)
-        window.$toast('Heads up', 'info', 0)             // info (persists)
-        window.$toast('Update available', 'warning', 0) // warning (persists)
-
-    Also renders session flash messages automatically.
---}}
-
-<div
+﻿<div
     x-data="{
-        MAX: 3,
-        get visible() {
-            return $store.toastQueue.items.slice(0, this.MAX);
+        toasts: [],
+        add(msg, type='success', duration=4500) {
+            const id = Date.now();
+            this.toasts.push({ id, msg, type, progress: 100 });
+            const interval = setInterval(() => {
+                const t = this.toasts.find(t => t.id === id);
+                if (t) { t.progress -= (100 / (duration / 100)); if (t.progress <= 0) { this.remove(id); clearInterval(interval); } }
+                else clearInterval(interval);
+            }, 100);
+            setTimeout(() => this.remove(id), duration);
         },
-        dismiss(id) {
-            $store.toastQueue.items = $store.toastQueue.items.filter(t => t.id !== id);
+        remove(id) { this.toasts = this.toasts.filter(t => t.id !== id); },
+        init() {
+            window.$toast = (msg, type='success') => this.add(msg, type);
+            @if(session('success')) this.add(@json(session('success')), 'success'); @endif
+            @if(session('error'))   this.add(@json(session('error')),   'error');   @endif
+            @if(session('warning')) this.add(@json(session('warning')), 'warning'); @endif
+            @if(session('info'))    this.add(@json(session('info')),    'info');    @endif
         }
     }"
-    class="fixed z-[9999] flex flex-col gap-2 pointer-events-none
-           top-4 inset-x-4 sm:inset-x-auto sm:right-4 sm:w-80
-           sm:top-auto sm:bottom-4"
-    aria-live="polite"
-    aria-atomic="false"
-    role="status"
+    class="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none max-w-sm w-full"
+    role="region"
+    aria-label="Notifications"
 >
-    <template x-for="toast in visible" :key="toast.id">
+    <template x-for="toast in toasts" :key="toast.id">
         <div
             x-show="true"
-            x-transition:enter="transition ease-out duration-150"
-            x-transition:enter-start="opacity-0 translate-y-2"
-            x-transition:enter-end="opacity-100 translate-y-0"
-            x-transition:leave="transition ease-in duration-100"
-            x-transition:leave-start="opacity-100 translate-y-0"
-            x-transition:leave-end="opacity-0 translate-y-2"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 translate-y-2 scale-95"
+            x-transition:enter-end="opacity-100 translate-y-0 scale-100"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100 translate-y-0 scale-100"
+            x-transition:leave-end="opacity-0 translate-y-2 scale-95"
+            class="pointer-events-auto relative overflow-hidden rounded-2xl shadow-xl ring-1 bg-white dark:bg-[#111118]"
             :class="{
-                'bg-emerald-600 text-white': toast.type === 'success',
-                'bg-rose-600 text-white':    toast.type === 'error',
-                'bg-indigo-600 text-white':  toast.type === 'info',
-                'bg-amber-500 text-white':   toast.type === 'warning',
+                'ring-emerald-200 dark:ring-emerald-500/20': toast.type === 'success',
+                'ring-rose-200 dark:ring-rose-500/20':     toast.type === 'error',
+                'ring-amber-200 dark:ring-amber-500/20':   toast.type === 'warning',
+                'ring-indigo-200 dark:ring-indigo-500/20': toast.type === 'info',
             }"
-            class="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl shadow-md max-w-full"
         >
-            {{-- Icon --}}
-            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path x-show="toast.type === 'success'" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-                <path x-show="toast.type === 'error'"   stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                <path x-show="toast.type === 'info' || toast.type === 'warning'" stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
-            </svg>
+            <div class="flex items-start gap-3 px-4 py-3.5">
+                {{-- Icon --}}
+                <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                     :class="{
+                         'bg-emerald-100 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400': toast.type === 'success',
+                         'bg-rose-100 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400':           toast.type === 'error',
+                         'bg-amber-100 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400':       toast.type === 'warning',
+                         'bg-indigo-100 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400':   toast.type === 'info',
+                     }">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                        <path x-show="toast.type==='success'" stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                        <path x-show="toast.type==='error'"   stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        <path x-show="toast.type==='warning'" stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                        <path x-show="toast.type==='info'"    stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                </div>
 
-            {{-- Message --}}
-            <p class="flex-1 text-[13px] font-medium leading-snug" x-text="toast.message"></p>
+                {{-- Message --}}
+                <p class="flex-1 text-sm font-medium text-slate-800 dark:text-slate-100 pt-1" x-text="toast.msg"></p>
 
-            {{-- Dismiss button --}}
-            <button
-                @click="dismiss(toast.id)"
-                class="flex-shrink-0 opacity-70 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-white focus:ring-offset-1 focus:ring-offset-current rounded"
-                aria-label="Dismiss notification"
-            >
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
+                {{-- Close --}}
+                <button @click="remove(toast.id)"
+                        class="flex-shrink-0 mt-0.5 rounded-lg p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">
+                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
+            </div>
+
+            {{-- Progress bar --}}
+            <div class="absolute bottom-0 left-0 h-0.5 rounded-full transition-all duration-100"
+                 :style="'width:' + toast.progress + '%'"
+                 :class="{
+                     'bg-emerald-400 dark:bg-emerald-500': toast.type === 'success',
+                     'bg-rose-400 dark:bg-rose-500':      toast.type === 'error',
+                     'bg-amber-400 dark:bg-amber-500':    toast.type === 'warning',
+                     'bg-indigo-400 dark:bg-indigo-500':  toast.type === 'info',
+                 }"></div>
         </div>
     </template>
-
-    {{-- Session flash messages (success, error) --}}
-    @if(session('success'))
-        <div
-            x-data="{ show: true }"
-            x-init="setTimeout(() => show = false, 3000)"
-            x-show="show"
-            x-transition:enter="transition ease-out duration-150"
-            x-transition:enter-start="opacity-0 translate-y-2"
-            x-transition:enter-end="opacity-100 translate-y-0"
-            x-transition:leave="transition ease-in duration-100"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-            class="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl shadow-md bg-emerald-600 text-white"
-        >
-            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
-            </svg>
-            <p class="flex-1 text-[13px] font-medium">{{ session('success') }}</p>
-        </div>
-    @endif
-
-    @if(session('error'))
-        <div
-            x-data="{ show: true }"
-            x-show="show"
-            class="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-xl shadow-md bg-rose-600 text-white"
-        >
-            <svg class="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-            <p class="flex-1 text-[13px] font-medium">{{ session('error') }}</p>
-            <button @click="show = false" class="flex-shrink-0 opacity-70 hover:opacity-100" aria-label="Dismiss">
-                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-            </button>
-        </div>
-    @endif
 </div>

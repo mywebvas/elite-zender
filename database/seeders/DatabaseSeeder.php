@@ -14,11 +14,26 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        $tenant = \App\Models\Tenant::factory()->create([
+            'name' => 'Acme Corp',
+        ]);
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
+        $user = User::factory()->create([
+            'tenant_id' => $tenant->id,
+            'name' => 'Demo Admin',
+            'email' => 'demo@elitesender.app',
+            'password' => \Illuminate\Support\Facades\Hash::make('password'),
+        ]);
+
+        // Seed some SMTP accounts for this tenant
+        \App\Models\SmtpAccount::factory(3)->create([
+            'tenant_id' => $tenant->id,
+        ]);
+
+        // Seed some Campaigns
+        \App\Models\Campaign::factory(5)->create([
+            'tenant_id' => $tenant->id,
+            'status' => 'completed',
         ]);
     }
 }

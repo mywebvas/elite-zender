@@ -23,10 +23,17 @@ class SecurityHeaders
     {
         $response = $next($request);
 
-        $response->headers->set(
-            'Content-Security-Policy',
-            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.bunny.net; font-src 'self' https://fonts.bunny.net; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';"
-        );
+        $nonce = \Illuminate\Support\Str::random(32);
+        \Illuminate\Support\Facades\View::share('cspNonce', $nonce);
+        \Illuminate\Support\Facades\Vite::useCspNonce($nonce);
+
+        $csp = "default-src 'self'; script-src 'self' 'nonce-{$nonce}' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.bunny.net; font-src 'self' https://fonts.bunny.net; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none';";
+
+        if (app()->environment('local')) {
+            $csp = "default-src 'self'; script-src 'self' 'nonce-{$nonce}' 'unsafe-eval' http://localhost:5173 http://127.0.0.1:5173 http://[::1]:5173; style-src 'self' 'unsafe-inline' https://fonts.bunny.net http://localhost:5173 http://127.0.0.1:5173 http://[::1]:5173; font-src 'self' https://fonts.bunny.net; img-src 'self' data:; connect-src 'self' ws://localhost:5173 ws://127.0.0.1:5173 ws://[::1]:5173 http://localhost:5173 http://127.0.0.1:5173 http://[::1]:5173; frame-ancestors 'none';";
+        }
+
+        $response->headers->set('Content-Security-Policy', $csp);
 
         // HSTS: 2 years, includeSubDomains, preload (docs/06-SECURITY-COMPLIANCE.md §1)
         $response->headers->set(

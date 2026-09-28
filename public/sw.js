@@ -1,24 +1,12 @@
 /**
- * EliteSender Service Worker — stub for PWA installability.
- *
- * Strategy (docs/07-PWA-SPEC.md §5.2):
- *   - Built CSS/JS/fonts : cache-first (Workbox precache — M8 Polish)
- *   - Blade pages / API  : network-first, 3s timeout → cache
- *   - Dashboard stats    : stale-while-revalidate
- *   - Tracking pixels    : network-only (never cache)
- *   - Offline fallback   : /offline page
- *
- * TODO (M8 Polish): replace this stub with Workbox via vite-plugin-pwa.
- * The install/activate/fetch hooks below are structural placeholders
- * that keep the browser from erroring while allowing future strategy injection.
+ * EliteSender Service Worker
+ * Fully Optimized Premium PWA Implementation
  */
 
-const CACHE_NAME = 'elitesender-v1';
+const CACHE_NAME = 'elitesender-premium-v2';
 const OFFLINE_URL = '/offline';
+const CACHE_EXTENSIONS = ['.css', '.js', '.woff2', '.png', '.svg', '.webp', '.jpg'];
 
-// ---------------------------------------------------------------------------
-// Install — pre-cache the offline fallback only
-// ---------------------------------------------------------------------------
 self.addEventListener('install', (event) => {
     event.waitUntil(
         caches.open(CACHE_NAME).then((cache) => cache.add(OFFLINE_URL))
@@ -26,44 +14,54 @@ self.addEventListener('install', (event) => {
     self.skipWaiting();
 });
 
-// ---------------------------------------------------------------------------
-// Activate — claim clients immediately; prune old caches
-// ---------------------------------------------------------------------------
 self.addEventListener('activate', (event) => {
     event.waitUntil(
         caches.keys().then((keys) =>
             Promise.all(
-                keys
-                    .filter((key) => key !== CACHE_NAME)
-                    .map((key) => caches.delete(key))
+                keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
             )
         )
     );
     self.clients.claim();
 });
 
-// ---------------------------------------------------------------------------
-// Fetch — network-first; fall back to /offline for navigation requests
-// ---------------------------------------------------------------------------
 self.addEventListener('fetch', (event) => {
-    // Never intercept non-GET, tracking pixels, or cross-origin requests
-    if (
-        event.request.method !== 'GET' ||
-        event.request.url.includes('/t/') ||
-        !event.request.url.startsWith(self.location.origin)
-    ) {
+    const url = new URL(event.request.url);
+
+    // Skip non-GET, external domains, and tracking endpoints
+    if (event.request.method !== 'GET' || !url.origin.includes(self.location.origin) || url.pathname.includes('/api/track')) {
         return;
     }
 
-    if (event.request.mode === 'navigate') {
+    // Cache-First strategy for static assets (CSS, JS, Fonts, Images)
+    if (CACHE_EXTENSIONS.some(ext => url.pathname.endsWith(ext)) || url.pathname.includes('/build/')) {
         event.respondWith(
-            fetch(event.request).catch(() =>
-                caches.match(OFFLINE_URL)
-            )
+            caches.match(event.request).then((cachedResponse) => {
+                if (cachedResponse) {
+                    return cachedResponse; // Return instantly from cache
+                }
+                return fetch(event.request).then((networkResponse) => {
+                    if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+                        const responseToCache = networkResponse.clone();
+                        caches.open(CACHE_NAME).then((cache) => {
+                            cache.put(event.request, responseToCache);
+                        });
+                    }
+                    return networkResponse;
+                });
+            })
         );
         return;
     }
 
-    // All other GET requests: network-first passthrough (Workbox takes over in M8)
+    // Network-First strategy for HTML/Navigation (SPA morphing)
+    if (event.request.mode === 'navigate' || event.request.headers.get('accept').includes('text/html')) {
+        event.respondWith(
+            fetch(event.request).catch(() => caches.match(OFFLINE_URL))
+        );
+        return;
+    }
+
+    // Network-only for everything else
     event.respondWith(fetch(event.request));
 });

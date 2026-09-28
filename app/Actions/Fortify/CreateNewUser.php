@@ -35,8 +35,10 @@ class CreateNewUser implements CreatesNewUsers
         ])->validate();
 
         return \Illuminate\Support\Facades\DB::transaction(function () use ($input) {
+            $workspaceName = explode(' ', $input['name'])[0] . "'s Workspace";
             $tenant = \App\Models\Tenant::create([
-                'name' => explode(' ', $input['name'])[0] . "'s Workspace",
+                'name' => $workspaceName,
+                'slug' => \Illuminate\Support\Str::slug($workspaceName) . '-' . uniqid(),
             ]);
 
             return User::create([

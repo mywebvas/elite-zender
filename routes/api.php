@@ -17,6 +17,13 @@ use Illuminate\Support\Facades\Route;
 // Fortify handles auth routes. If API tokens are used later, they use Sanctum's createToken.
 
 // ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+Route::prefix('v1')->middleware('throttle:60,1')->group(function () {
+    Route::post('leads/capture', [\App\Http\Controllers\Api\LeadCaptureController::class, 'store']);
+});
+
+// ---------------------------------------------------------------------------
 // Authenticated API — tenant-scoped, plan-tiered rate limit
 // ---------------------------------------------------------------------------
 Route::prefix('v1')

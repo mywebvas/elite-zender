@@ -22,4 +22,9 @@ class Tenant extends Model
             'settings' => 'array',
         ];
     }
+
+    public function smtpAccounts()
+    {
+        return $this->hasMany(SmtpAccount::class);
+    }
 }

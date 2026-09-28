@@ -1,6 +1,12 @@
 import './bootstrap';
 
 import Alpine from 'alpinejs';
+import intersect from '@alpinejs/intersect';
+Alpine.plugin(intersect);
+import Quill from 'quill';
+import 'quill/dist/quill.snow.css';
+
+window.Quill = Quill;
 
 // ---------------------------------------------------------------------------
 // Dark-mode: read persisted preference, apply before paint to avoid flash
@@ -80,3 +86,6 @@ if ('serviceWorker' in navigator) {
 
 window.Alpine = Alpine;
 Alpine.start();
+
+
+document.addEventListener('turbo:load', () => { if (window.Alpine) { window.Alpine.initTree(document.body); } });

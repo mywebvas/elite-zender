@@ -1,4 +1,7 @@
 <?php
+if (!defined('SIGINT')) define('SIGINT', 2);
+if (!defined('SIGTERM')) define('SIGTERM', 15);
+if (!defined('SIGHUP')) define('SIGHUP', 1);
 
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;

@@ -1,8 +1,16 @@
-@props([
+﻿@props([
     'padding' => true,
+    'variant' => 'default',
     'class'   => '',
 ])
-
-<div {{ $attributes->merge(['class' => 'rounded-xl shadow-sm bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 ' . ($padding ? 'p-6' : '') . ' ' . $class]) }}>
+@php
+$variants = [
+    'default'  => 'card',
+    'elevated' => 'card-elevated',
+    'bordered' => 'card-bordered',
+];
+$base = $variants[$variant] ?? 'card';
+@endphp
+<div {{ $attributes->merge(['class' => $base . ($padding ? ' p-6' : '') . ' ' . $class]) }}>
     {{ $slot }}
 </div>

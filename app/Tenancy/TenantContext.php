@@ -10,31 +10,34 @@ use Illuminate\Contracts\Auth\Authenticatable;
  */
 final class TenantContext
 {
-    private static ?Tenant $tenant = null;
-
     public static function set(?Tenant $tenant): void
     {
-        self::$tenant = $tenant;
+        if ($tenant) {
+            app()->instance('current_tenant', $tenant);
+        } else {
+            app()->forgetInstance('current_tenant');
+        }
     }
 
     public static function id(): ?string
     {
-        return self::$tenant?->id;
+        return self::tenant()?->id;
     }
 
     public static function tenant(): ?Tenant
     {
-        return self::$tenant;
+        return app()->bound('current_tenant') ? app('current_tenant') : null;
     }
 
     public static function short(): ?string
     {
-        return self::$tenant ? substr(self::$tenant->id, 0, 8) : null;
+        $tenant = self::tenant();
+        return $tenant ? substr($tenant->id, 0, 8) : null;
     }
 
     /** Tenant context for a user (used by queue workers where no request exists). */
     public static function bindForUser(Authenticatable $user): void
     {
-        self::$tenant = $user instanceof \App\Models\User ? $user->tenant : null;
+        self::set($user instanceof \App\Models\User ? $user->tenant : null);
     }
 }

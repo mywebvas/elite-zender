@@ -31,6 +31,7 @@ class SmtpAccount extends Model
             'sent_today' => 'integer',
             'health_score' => 'integer',
             'last_checked_at' => 'datetime',
+            'password' => 'encrypted',
         ];
     }
 }

@@ -12,7 +12,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('campaigns', function (Blueprint $table) {
+        Schema::create('campaigns', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->uuid('tenant_id')->index();
             $table->string('name', 120);
@@ -31,7 +31,7 @@ return new class extends Migration
         });
 
         // Pivot: campaign ↔ smtp_account (rotation pool)
-        Schema::create('campaign_smtp_account', function (Blueprint $table) {
+        Schema::create('campaign_smtp_account', function (Blueprint $table): void {
             $table->id();
             $table->uuid('campaign_id');
             $table->uuid('smtp_account_id');

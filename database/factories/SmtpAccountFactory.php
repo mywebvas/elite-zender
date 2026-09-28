@@ -4,7 +4,6 @@ namespace Database\Factories;
 
 use App\Models\SmtpAccount;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Facades\Crypt;
 
 /**
  * @extends Factory<SmtpAccount>
@@ -18,11 +17,14 @@ class SmtpAccountFactory extends Factory
     {
         return [
             'tenant_id' => \App\Models\Tenant::factory(),
-            'name' => fake()->company() . ' SMTP',
+            'name' => fake()->company().' SMTP',
             'host' => fake()->domainName(),
             'port' => 587,
             'username' => fake()->userName(),
-            'password' => Crypt::encryptString(fake()->password()),
+            // NOT Crypt::encryptString(): SmtpAccount casts `password` as
+            // `encrypted`, so pre-encrypting here produced a double-wrapped
+            // value that decrypts to ciphertext at send time.
+            'password' => fake()->password(),
             'encryption' => 'tls',
             'from_email' => fake()->safeEmail(),
             'from_name' => fake()->name(),

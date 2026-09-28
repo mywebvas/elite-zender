@@ -3,9 +3,8 @@
 use App\Models\Campaign;
 use App\Models\Contact;
 use App\Models\User;
-use Illuminate\Support\Facades\URL;
 
-test('pixel endpoint logs open and returns gif', function () {
+test('pixel endpoint logs open and returns gif', function (): void {
     $user = User::factory()->create();
     $campaign = Campaign::factory()->create(['tenant_id' => $user->tenant_id]);
     $contact = Contact::factory()->create(['tenant_id' => $user->tenant_id]);
@@ -17,11 +16,11 @@ test('pixel endpoint logs open and returns gif', function () {
     $this->assertDatabaseHas('campaign_events', [
         'campaign_id' => $campaign->id,
         'contact_id' => $contact->id,
-        'type' => 'open'
+        'type' => 'open',
     ]);
 });
 
-test('click endpoint logs click and redirects', function () {
+test('click endpoint logs click and redirects', function (): void {
     $user = User::factory()->create();
     $campaign = Campaign::factory()->create(['tenant_id' => $user->tenant_id]);
     $contact = Contact::factory()->create(['tenant_id' => $user->tenant_id]);
@@ -36,6 +35,6 @@ test('click endpoint logs click and redirects', function () {
         'campaign_id' => $campaign->id,
         'contact_id' => $contact->id,
         'type' => 'click',
-        'url' => $url
+        'url' => $url,
     ]);
 });

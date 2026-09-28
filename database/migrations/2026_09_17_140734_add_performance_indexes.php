@@ -16,7 +16,7 @@ return new class extends Migration
     public function up(): void
     {
         // campaign_events: aggregation queries by type (open/click rates)
-        Schema::table('campaign_events', function (Blueprint $table) {
+        Schema::table('campaign_events', function (Blueprint $table): void {
             $table->index(['campaign_id', 'type'], 'idx_events_campaign_type');
             $table->index(['contact_id'], 'idx_events_contact');
             $table->index(['created_at'], 'idx_events_created');
@@ -24,12 +24,12 @@ return new class extends Migration
         });
 
         // contacts: CSV import dedup + active-only filtering
-        Schema::table('contacts', function (Blueprint $table) {
+        Schema::table('contacts', function (Blueprint $table): void {
             $table->index(['tenant_id', 'status'], 'idx_contacts_tenant_status');
         });
 
         // campaigns: dashboard list queries
-        Schema::table('campaigns', function (Blueprint $table) {
+        Schema::table('campaigns', function (Blueprint $table): void {
             $table->index(['tenant_id', 'status', 'created_at'], 'idx_campaigns_tenant_status');
         });
     }
@@ -39,18 +39,18 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('campaign_events', function (Blueprint $table) {
+        Schema::table('campaign_events', function (Blueprint $table): void {
             $table->dropIndex('idx_events_campaign_type');
             $table->dropIndex('idx_events_contact');
             $table->dropIndex('idx_events_created');
             $table->dropIndex('idx_events_tenant_type');
         });
 
-        Schema::table('contacts', function (Blueprint $table) {
+        Schema::table('contacts', function (Blueprint $table): void {
             $table->dropIndex('idx_contacts_tenant_status');
         });
 
-        Schema::table('campaigns', function (Blueprint $table) {
+        Schema::table('campaigns', function (Blueprint $table): void {
             $table->dropIndex('idx_campaigns_tenant_status');
         });
     }

@@ -3,43 +3,42 @@
 namespace App\Mail;
 
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
-use Illuminate\Mail\Mailables\Attachment;
 use Illuminate\Mail\Mailables\Content;
 use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
+use Symfony\Component\Mime\Header\UnstructuredHeader;
 
+/**
+ * A single rendered campaign message.
+ *
+ * Bodies arrive pre-rendered (spin syntax expanded, tracking injected), so we
+ * hand Laravel a raw HTML string and render the plain-text alternative through
+ * a passthrough view — `Content` only accepts *view names* for the text part,
+ * there is no `textString` parameter.
+ */
 class CampaignEmail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public string $campaignSubject;
-    public string $htmlBody;
-    public string $textBody;
-    public ?string $unsubUrl;
+    public function __construct(
+        public string $campaignSubject,
+        public string $htmlBody,
+        public string $textBody = '',
+        public ?string $unsubUrl = null,
+    ) {}
 
-    /**
-     * Create a new message instance.
-     */
-    public function __construct(string $subject, string $htmlBody, string $textBody = '', ?string $unsubUrl = null)
-    {
-        $this->campaignSubject = $subject;
-        $this->htmlBody = $htmlBody;
-        $this->textBody = $textBody;
-        $this->unsubUrl = $unsubUrl;
-    }
-
-    /**
-     * Get the message envelope.
-     */
     public function envelope(): Envelope
     {
         $headers = [];
-        if ($this->unsubUrl) {
+
+        if ($this->unsubUrl !== null && $this->unsubUrl !== '') {
+            // RFC 8058 one-click unsubscribe. Gmail/Yahoo require both headers
+            // for bulk senders; List-Unsubscribe-Post makes the POST variant
+            // valid without any user interaction.
             $headers = [
-                new \Symfony\Component\Mime\Header\UnstructuredHeader('List-Unsubscribe', '<' . $this->unsubUrl . '>'),
-                new \Symfony\Component\Mime\Header\UnstructuredHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click'),
+                new UnstructuredHeader('List-Unsubscribe', '<'.$this->unsubUrl.'>'),
+                new UnstructuredHeader('List-Unsubscribe-Post', 'List-Unsubscribe=One-Click'),
             ];
         }
 
@@ -49,21 +48,17 @@ class CampaignEmail extends Mailable
         );
     }
 
-    /**
-     * Get the message content definition.
-     */
     public function content(): Content
     {
         return new Content(
+            text: $this->textBody === '' ? null : 'emails.campaign-plain',
+            with: ['plain' => $this->textBody],
             htmlString: $this->htmlBody,
-            textString: $this->textBody,
         );
     }
 
     /**
-     * Get the attachments for the message.
-     *
-     * @return array<int, Attachment>
+     * @return array<int, \Illuminate\Mail\Mailables\Attachment>
      */
     public function attachments(): array
     {

@@ -1,12 +1,12 @@
 <?php
 
+use App\Jobs\DispatchCampaignJob;
 use App\Models\Campaign;
 use App\Models\ContactList;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
-use App\Jobs\DispatchCampaignJob;
 
-test('a user can dispatch a campaign', function () {
+test('a user can dispatch a campaign', function (): void {
     Queue::fake();
 
     $user = User::factory()->create();
@@ -14,7 +14,7 @@ test('a user can dispatch a campaign', function () {
     $campaign = Campaign::factory()->create([
         'tenant_id' => $user->tenant_id,
         'list_id' => $list->id,
-        'status' => 'draft'
+        'status' => 'draft',
     ]);
 
     $this->actingAs($user)

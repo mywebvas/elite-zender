@@ -2,42 +2,212 @@ name: CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ['**']
   pull_request:
-    branches: [ "main" ]
+    branches: [main]
+
+# A new push to the same ref supersedes the in-flight run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  # The lock file pins Symfony 8, which requires PHP >= 8.4.1.
+  PHP_VERSION: '8.4'
 
 jobs:
-  tests:
+  static-analysis:
+    name: Static analysis (Pint + PHPStan)
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.3'
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite3, pdo_sqlite, bcmath, soap, intl, readline, ldap, msgpack, igbinary, redis
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, intl, bcmath, pdo_sqlite, redis
           coverage: none
+          tools: composer:v2
 
-      - name: Install Dependencies
-        run: composer install -q --no-ansi --no-interaction --no-scripts --no-progress --prefer-dist
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php${{ env.PHP_VERSION }}-
 
-      - name: Copy .env
-        run: php -r "file_exists('.env') || copy('.env.example', '.env');"
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
 
-      - name: Generate key
-        run: php artisan key:generate
+      - name: Validate composer.json / composer.lock are in sync
+        run: composer validate --strict --no-check-publish
 
-      - name: Directory Permissions
-        run: chmod -R 777 storage bootstrap/cache
+      - name: Check code style
+        run: vendor/bin/pint --test
 
-      - name: Create Database
+      - name: Static analysis
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build assets
+        run: npm run build
+
+      # The test suite renders Blade templates that call @vite(), so the
+      # manifest has to exist. CI never built it before, which is why
+      # "Vite manifest not found" reached main.
+      - name: Upload build output
+        uses: actions/upload-artifact@v4
+        with:
+          name: vite-build
+          path: public/build
+          retention-days: 1
+
+  tests:
+    name: Tests (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    needs: frontend
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # 8.4 is the floor declared in composer.json; 8.5 is the documented
+        # target runtime (docs/README.md decision #3).
+        php: ['8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: mbstring, intl, bcmath, pdo_sqlite, redis
+          coverage: none
+          tools: composer:v2
+
+      - name: Cache Composer packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/composer/files
+          key: composer-${{ runner.os }}-php${{ matrix.php }}-${{ hashFiles('composer.lock') }}
+          restore-keys: composer-${{ runner.os }}-php${{ matrix.php }}-
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
+
+      - name: Download built assets
+        uses: actions/download-artifact@v4
+        with:
+          name: vite-build
+          path: public/build
+
+      - name: Prepare environment
         run: |
+          cp .env.example .env
+          php artisan key:generate
           mkdir -p database
           touch database/database.sqlite
 
-      - name: Run Migrations
-        run: php artisan migrate -q --no-ansi --no-interaction --force
+      - name: Run migrations
+        run: php artisan migrate --force
+        env:
+          DB_CONNECTION: sqlite
+          DB_DATABASE: database/database.sqlite
 
-      - name: Execute tests
-        run: php artisan test
+      - name: Run test suite
+        run: vendor/bin/pest --ci
+
+  # Proves the schema is valid on the engine production actually runs
+  # (docs/README.md decision #4). SQLite's loose typing hid a uuid/bigint
+  # foreign-key mismatch that PostgreSQL rejects outright.
+  postgres-migrations:
+    name: PostgreSQL 17 migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: elitezender
+          POSTGRES_USER: elitezender
+          POSTGRES_PASSWORD: secret
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          extensions: mbstring, intl, bcmath, pdo_pgsql
+          coverage: none
+          tools: composer:v2
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress --no-scripts
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Migrate (up and back down)
+        run: |
+          php artisan migrate --force
+          php artisan migrate:rollback --force --step=100
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: elitezender
+          DB_USERNAME: elitezender
+          DB_PASSWORD: secret
+
+  security:
+    name: Dependency audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+          tools: composer:v2
+
+      - name: Composer audit
+        run: composer audit --no-interaction --locked --abandoned=report
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: npm audit
+        run: npm audit --audit-level=high
+        continue-on-error: true

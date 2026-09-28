@@ -2,75 +2,88 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreContactRequest;
+use App\Models\Contact;
+use App\Models\ContactList;
+use App\Models\Tag;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class ContactController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index(\Illuminate\Http\Request $request)
+    public function index(Request $request): View
     {
-        // Eager load tags to avoid N+1 queries when rendering the table
-        $query = \App\Models\Contact::with('tags');
-        
-        if ($request->has('list_id') && $request->list_id !== '') {
-            $query->whereHas('lists', function($q) use ($request) {
-                $q->where('contact_lists.id', $request->list_id);
-            });
-        }
+        $this->authorize('viewAny', Contact::class);
 
-        if ($request->has('tag_id') && $request->tag_id !== '') {
-            $query->whereHas('tags', function($q) use ($request) {
-                $q->where('tags.id', $request->tag_id);
-            });
-        }
-        
-        $contacts = $query->latest()->paginate(50);
-        $lists = \App\Models\ContactList::orderBy('name')->get();
-        $tags = \App\Models\Tag::orderBy('name')->get();
-        
-        return view('contacts.index', compact('contacts', 'lists', 'tags'));
+        $filters = $request->validate([
+            'list_id' => ['nullable', 'string'],
+            'tag_id' => ['nullable', 'string'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string', 'in:'.implode(',', Contact::STATUSES)],
+        ]);
+
+        // Eager load tags to avoid N+1 queries when rendering the table.
+        $contacts = Contact::query()
+            ->with('tags')
+            ->when(filled($filters['list_id'] ?? null), fn ($q) => $q->whereHas(
+                'lists',
+                fn ($l) => $l->where('contact_lists.id', $filters['list_id']),
+            ))
+            ->when(filled($filters['tag_id'] ?? null), fn ($q) => $q->whereHas(
+                'tags',
+                fn ($t) => $t->where('tags.id', $filters['tag_id']),
+            ))
+            ->when(filled($filters['status'] ?? null), fn ($q) => $q->where('status', $filters['status']))
+            ->when(filled($filters['search'] ?? null), fn ($q) => $q->where(function ($inner) use ($filters): void {
+                $term = '%'.str_replace(['%', '_'], ['\%', '\_'], $filters['search']).'%';
+                $inner->where('email', 'like', $term)
+                    ->orWhere('first_name', 'like', $term)
+                    ->orWhere('last_name', 'like', $term);
+            }))
+            ->latest()
+            ->paginate(50)
+            ->withQueryString();
+
+        return view('contacts.index', [
+            'contacts' => $contacts,
+            'lists' => ContactList::orderBy('name')->get(),
+            'tags' => Tag::orderBy('name')->get(),
+            'filters' => $filters,
+        ]);
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(\App\Http\Requests\StoreContactRequest $request)
+    public function store(StoreContactRequest $request): RedirectResponse
     {
+        $this->authorize('create', Contact::class);
+
         $validated = $request->validated();
-        
-        $contact = \App\Models\Contact::create([
+
+        $contact = Contact::create([
             'email' => $validated['email'],
             'first_name' => $validated['first_name'] ?? null,
             'last_name' => $validated['last_name'] ?? null,
         ]);
-        
-        if (!empty($validated['list_id'])) {
-            $contact->lists()->attach($validated['list_id']);
+
+        if (! empty($validated['list_id'])) {
+            $contact->lists()->syncWithoutDetaching([$validated['list_id']]);
         }
 
-        if ($request->filled('tags')) {
-            $tagNames = array_filter(array_map('trim', explode(',', $request->tags)));
-            $tagIds = [];
-            foreach ($tagNames as $tagName) {
-                $tag = \App\Models\Tag::firstOrCreate(['name' => $tagName]);
-                $tagIds[] = $tag->id;
-            }
-            $contact->tags()->sync($tagIds);
+        if (filled($validated['tags'] ?? null)) {
+            $contact->tags()->sync(Tag::idsForNames((string) $validated['tags']));
         }
-        
+
         return redirect()->back()->with('success', 'Contact added successfully.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(string $id): RedirectResponse
     {
-        $contact = \App\Models\Contact::findOrFail($id);
+        $contact = Contact::findOrFail($id);
+
+        $this->authorize('delete', $contact);
+
         $contact->delete();
-        
+
         return redirect()->back()->with('success', 'Contact deleted successfully.');
     }
 }

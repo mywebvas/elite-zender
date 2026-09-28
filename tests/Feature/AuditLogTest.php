@@ -11,10 +11,9 @@ use App\Tenancy\TenantContext;
  * AuditLog — verifies append-only audit trail is written on key mutations.
  * Spec: docs/06-SECURITY-COMPLIANCE.md §1 Audit.
  */
-
-beforeEach(function () {
+beforeEach(function (): void {
     $this->tenant = Tenant::factory()->create();
-    $this->user   = User::factory()->create(['tenant_id' => $this->tenant->id]);
+    $this->user = User::factory()->create(['tenant_id' => $this->tenant->id]);
     TenantContext::set($this->tenant);
     $this->actingAs($this->user);
 });
@@ -23,7 +22,7 @@ beforeEach(function () {
 // User audit hooks
 // ---------------------------------------------------------------------------
 
-test('AuditLog is written when a user is created', function () {
+test('AuditLog is written when a user is created', function (): void {
     $initialCount = AuditLog::withoutGlobalScopes()->count();
 
     User::factory()->create(['tenant_id' => $this->tenant->id, 'name' => 'New Member']);
@@ -44,7 +43,7 @@ test('AuditLog is written when a user is created', function () {
 // SmtpAccount audit hooks
 // ---------------------------------------------------------------------------
 
-test('AuditLog is written when an SMTP account is created', function () {
+test('AuditLog is written when an SMTP account is created', function (): void {
     SmtpAccount::factory()->create(['name' => 'SendGrid Primary']);
 
     $log = AuditLog::withoutGlobalScopes()
@@ -57,7 +56,7 @@ test('AuditLog is written when an SMTP account is created', function () {
     expect($log->new_values['name'])->toBe('SendGrid Primary');
 });
 
-test('AuditLog is written when an SMTP account is deleted', function () {
+test('AuditLog is written when an SMTP account is deleted', function (): void {
     $account = SmtpAccount::factory()->create();
     $account->delete();
 
@@ -71,7 +70,7 @@ test('AuditLog is written when an SMTP account is deleted', function () {
     expect($log)->not->toBeNull();
 });
 
-test('AuditLog old_values captures before state on update', function () {
+test('AuditLog old_values captures before state on update', function (): void {
     $account = SmtpAccount::factory()->create(['name' => 'Old Name']);
     $account->update(['name' => 'New Name']);
 
@@ -91,7 +90,7 @@ test('AuditLog old_values captures before state on update', function () {
 // Campaign audit hooks
 // ---------------------------------------------------------------------------
 
-test('AuditLog is written when a campaign is created', function () {
+test('AuditLog is written when a campaign is created', function (): void {
     Campaign::factory()->create(['name' => 'Launch Blast']);
 
     $log = AuditLog::withoutGlobalScopes()
@@ -104,7 +103,7 @@ test('AuditLog is written when a campaign is created', function () {
     expect($log->new_values['name'])->toBe('Launch Blast');
 });
 
-test('AuditLog is written when a campaign is soft-deleted', function () {
+test('AuditLog is written when a campaign is soft-deleted', function (): void {
     $campaign = Campaign::factory()->create();
     $campaign->delete();
 
@@ -122,26 +121,26 @@ test('AuditLog is written when a campaign is soft-deleted', function () {
 // Immutability guard
 // ---------------------------------------------------------------------------
 
-test('AuditLog records cannot be updated', function () {
+test('AuditLog records cannot be updated', function (): void {
     $log = AuditLog::create([
-        'event'          => 'created',
+        'event' => 'created',
         'auditable_type' => User::class,
-        'auditable_id'   => $this->user->id,
-        'old_values'     => [],
-        'new_values'     => ['name' => 'Test'],
+        'auditable_id' => $this->user->id,
+        'old_values' => [],
+        'new_values' => ['name' => 'Test'],
     ]);
 
-    expect(fn () => $log->update(['event' => 'tampered']))->toThrow(\LogicException::class);
+    expect(fn () => $log->update(['event' => 'tampered']))->toThrow(LogicException::class);
 });
 
-test('AuditLog records cannot be deleted', function () {
+test('AuditLog records cannot be deleted', function (): void {
     $log = AuditLog::create([
-        'event'          => 'created',
+        'event' => 'created',
         'auditable_type' => User::class,
-        'auditable_id'   => $this->user->id,
-        'old_values'     => [],
-        'new_values'     => [],
+        'auditable_id' => $this->user->id,
+        'old_values' => [],
+        'new_values' => [],
     ]);
 
-    expect(fn () => $log->delete())->toThrow(\LogicException::class);
+    expect(fn () => $log->delete())->toThrow(LogicException::class);
 });

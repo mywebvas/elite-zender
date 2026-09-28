@@ -1,0 +1,26 @@
+name: Feature request
+description: Propose a capability or improvement
+labels: ['enhancement', 'needs-triage']
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the user's situation, not the implementation.
+    validations: { required: true }
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+    validations: { required: true }
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+  - type: checkboxes
+    id: decisions
+    attributes:
+      label: Decision log
+      options:
+        - label: I have checked this does not contradict a locked decision in docs/README.md
+          required: true

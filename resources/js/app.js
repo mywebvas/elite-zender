@@ -1,15 +1,27 @@
 import './bootstrap';
 
-import Alpine from 'alpinejs';
 import intersect from '@alpinejs/intersect';
-Alpine.plugin(intersect);
+import Alpine from 'alpinejs';
 import Quill from 'quill';
 import 'quill/dist/quill.snow.css';
 
+// Turbo is bundled, not pulled from a CDN at runtime.
+//
+// The layout used to load it from cdn.jsdelivr.net with a <script type=module>
+// tag. Two problems: the Content-Security-Policy only allows `script-src
+// 'self'` plus a nonce, so the browser blocked it outright and every
+// `turbo:load` listener below was dead code; and a third-party CDN in the
+// critical path is an availability and supply-chain dependency we do not need.
+import * as Turbo from '@hotwired/turbo';
+
+Alpine.plugin(intersect);
+
 window.Quill = Quill;
+window.Turbo = Turbo;
 
 // ---------------------------------------------------------------------------
-// Dark-mode: read persisted preference, apply before paint to avoid flash
+// Dark mode — the inline <head> script already applied the class before first
+// paint; this keeps the module in sync for anything that reads it later.
 // ---------------------------------------------------------------------------
 const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 const storedTheme = localStorage.getItem('theme');
@@ -19,38 +31,59 @@ if (storedTheme === 'dark' || (!storedTheme && prefersDark)) {
 
 // ---------------------------------------------------------------------------
 // $toast — global toast manager (docs/07-PWA-SPEC.md §4.1)
-// Used by x-toast component and window.$toast()
 // ---------------------------------------------------------------------------
 const toastQueue = Alpine.reactive({ items: [] });
 
-window.$toast = function (message, type = 'success', duration = 3000) {
-    const id = Date.now() + Math.random();
-    toastQueue.items.push({ id, message, type, duration });
-
-    if (type === 'success' && duration > 0) {
-        setTimeout(() => {
-            toastQueue.items = toastQueue.items.filter((t) => t.id !== id);
-        }, duration);
-    }
+const dismissToast = (id) => {
+    toastQueue.items = toastQueue.items.filter((t) => t.id !== id);
 };
 
-Alpine.magic('toast', () => window.$toast);
+window.$toast = function (message, type = 'success', duration = 3000) {
+    const id = `${Date.now()}-${Math.random()}`;
+    toastQueue.items.push({ id, message, type, duration });
 
-// Expose queue so x-toast component can bind to it
+    // Errors persist until dismissed; everything else auto-expires. Previously
+    // only `success` was auto-dismissed, so informational toasts piled up on
+    // screen forever.
+    if (type !== 'error' && duration > 0) {
+        setTimeout(() => dismissToast(id), duration);
+    }
+
+    // Mirror the message into the live region so screen readers announce it.
+    const announcer = document.getElementById('sr-announce');
+    if (announcer) {
+        announcer.textContent = message;
+    }
+
+    return id;
+};
+
+window.$dismissToast = dismissToast;
+
+Alpine.magic('toast', () => window.$toast);
 Alpine.store('toastQueue', toastQueue);
 
 // ---------------------------------------------------------------------------
 // x-transition preset — 150ms ease-out per spec (docs/07-PWA-SPEC.md §3)
+// Honours prefers-reduced-motion: an animation the user asked us not to play
+// is an accessibility failure, not a flourish.
 // ---------------------------------------------------------------------------
 document.addEventListener('alpine:init', () => {
-    Alpine.data('transitionPreset', () => ({
-        enter: 'transition ease-out duration-150',
-        enterStart: 'opacity-0 translate-y-1',
-        enterEnd: 'opacity-100 translate-y-0',
-        leave: 'transition ease-in duration-100',
-        leaveStart: 'opacity-100 translate-y-0',
-        leaveEnd: 'opacity-0 translate-y-1',
-    }));
+    const reduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    Alpine.data('transitionPreset', () => (reduced
+        ? {
+            enter: '', enterStart: '', enterEnd: '',
+            leave: '', leaveStart: '', leaveEnd: '',
+        }
+        : {
+            enter: 'transition ease-out duration-150',
+            enterStart: 'opacity-0 translate-y-1',
+            enterEnd: 'opacity-100 translate-y-0',
+            leave: 'transition ease-in duration-100',
+            leaveStart: 'opacity-100 translate-y-0',
+            leaveEnd: 'opacity-0 translate-y-1',
+        }));
 });
 
 // ---------------------------------------------------------------------------
@@ -61,25 +94,18 @@ if ('serviceWorker' in navigator) {
         navigator.serviceWorker
             .register('/sw.js', { scope: '/' })
             .then((registration) => {
-                // Detect SW update — toast the user (non-intrusive)
                 registration.addEventListener('updatefound', () => {
                     const newWorker = registration.installing;
+
                     newWorker?.addEventListener('statechange', () => {
-                        if (
-                            newWorker.state === 'installed' &&
-                            navigator.serviceWorker.controller
-                        ) {
-                            window.$toast(
-                                'Update available — refresh to apply.',
-                                'info',
-                                0  // persist until user acts
-                            );
+                        if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                            window.$toast('Update available — refresh to apply.', 'info', 0);
                         }
                     });
                 });
             })
             .catch(() => {
-                // SW registration failure is non-fatal — app still works
+                // Registration failure is non-fatal; the app still works online.
             });
     });
 }
@@ -87,5 +113,8 @@ if ('serviceWorker' in navigator) {
 window.Alpine = Alpine;
 Alpine.start();
 
-
-document.addEventListener('turbo:load', () => { if (window.Alpine) { window.Alpine.initTree(document.body); } });
+// Turbo swaps <body> without a full page load, so Alpine has to re-scan the
+// new DOM. This listener only works now that Turbo is actually loaded.
+document.addEventListener('turbo:load', () => {
+    window.Alpine?.initTree(document.body);
+});

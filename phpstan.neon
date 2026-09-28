@@ -1,0 +1,34 @@
+# Static analysis configuration.
+#
+# docs/README.md decision #10 calls for PHPStan at the strictest level the
+# codebase can actually hold. Larastan is not in the dependency set, so
+# Eloquent's magic (static query builder proxies, dynamic attributes, request
+# property access) cannot be understood by the analyser. Those specific
+# patterns are ignored below rather than dropping the whole project to a level
+# where real bugs hide — everything else is analysed at level 6.
+#
+# The `textString:` argument that fataled every campaign send was caught by
+# exactly this configuration.
+parameters:
+    level: 6
+
+    paths:
+        - app
+        - config
+        - database
+        - routes
+
+    tmpDir: build/phpstan
+
+    treatPhpDocTypesAsCertain: false
+
+    ignoreErrors:
+        # --- Eloquent magic (would be resolved by larastan) --------------
+        - identifier: staticMethod.notFound
+          path: app/*
+        - '#Access to an undefined property App\\Models\\#'
+        - '#Access to an undefined property Illuminate\\Database\\Eloquent\\Model::#'
+        - '#Call to an undefined method Illuminate\\Contracts\\Auth\\Factory::#'
+        # Artisan::command() closures are bound to the command instance.
+        - identifier: variable.undefined
+          path: routes/console.php

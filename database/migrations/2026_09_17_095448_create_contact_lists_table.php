@@ -11,14 +11,14 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('contact_lists', function (Blueprint $table) {
+        Schema::create('contact_lists', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->text('description')->nullable();
             $table->timestamps();
             $table->softDeletes();
-            
+
             // Allow same list name across tenants, but unique within a tenant
             $table->unique(['tenant_id', 'name']);
         });

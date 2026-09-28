@@ -2,20 +2,25 @@
 
 namespace App\Http\Controllers;
 
+use App\Http\Requests\StoreCampaignRequest;
+use App\Http\Requests\UpdateCampaignRequest;
+use App\Jobs\DispatchCampaignJob;
 use App\Models\Campaign;
 use App\Models\ContactList;
 use App\Models\SmtpAccount;
-use App\Http\Requests\StoreCampaignRequest;
-use Illuminate\Http\Request;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class CampaignController extends Controller
 {
     /** List all campaigns with preloaded counts — paginated for performance. */
-    public function index()
+    public function index(): View
     {
+        $this->authorize('viewAny', Campaign::class);
+
         $campaigns = Campaign::with('list')
             ->withCount([
-                'events as opens_count'  => fn ($q) => $q->where('type', 'open'),
+                'events as opens_count' => fn ($q) => $q->where('type', 'open'),
                 'events as clicks_count' => fn ($q) => $q->where('type', 'click'),
             ])
             ->latest()
@@ -25,136 +30,144 @@ class CampaignController extends Controller
     }
 
     /** Campaign builder — passes real lists and SMTP accounts. */
-    public function create()
+    public function create(): View
     {
-        $lists        = ContactList::orderBy('name')->get(['id', 'name']);
-        $smtpAccounts = SmtpAccount::where('status', 'active')->orderBy('name')->get(['id', 'name', 'from_email']);
+        $this->authorize('create', Campaign::class);
 
-        return view('campaigns.builder', compact('lists', 'smtpAccounts'));
+        return view('campaigns.builder', [
+            'lists' => $this->lists(),
+            'smtpAccounts' => $this->activeSmtpAccounts(),
+        ]);
     }
 
     /** Save new campaign draft. */
-    public function store(StoreCampaignRequest $request)
+    public function store(StoreCampaignRequest $request): RedirectResponse
     {
-        $data    = $request->validated();
+        $this->authorize('create', Campaign::class);
+
+        $data = $request->validated();
         $smtpIds = $data['smtp_account_ids'] ?? [];
         unset($data['smtp_account_ids']);
-        $data['status'] = 'draft';
+        $data['status'] = Campaign::STATUS_DRAFT;
 
         $campaign = Campaign::create($data);
 
-        if (!empty($smtpIds)) {
-            $campaign->smtpAccounts()->sync($smtpIds);
-        }
+        $campaign->smtpAccounts()->sync($smtpIds);
 
         return redirect()->route('campaigns.index')->with('success', 'Campaign saved successfully.');
     }
 
     /** Campaign detail view with full analytics. */
-    public function show(string $id)
+    public function show(string $id): View
     {
         $campaign = Campaign::with(['list', 'smtpAccounts'])
             ->withCount([
-                'events as opens_count'  => fn ($q) => $q->where('type', 'open'),
+                'events as opens_count' => fn ($q) => $q->where('type', 'open'),
                 'events as clicks_count' => fn ($q) => $q->where('type', 'click'),
             ])
             ->findOrFail($id);
 
-        $sentCount = $campaign->stats_cache['sent'] ?? ($campaign->list ? $campaign->list->contacts()->count() : 0);
+        $this->authorize('view', $campaign);
+
+        $sentCount = $campaign->stats_cache['sent'] ?? ($campaign->list?->contacts()->count() ?? 0);
 
         return view('campaigns.show', compact('campaign', 'sentCount'));
     }
 
     /** Edit a draft campaign. */
-    public function edit(string $id)
+    public function edit(string $id): View|RedirectResponse
     {
         $campaign = Campaign::with('smtpAccounts')->findOrFail($id);
 
-        if ($campaign->status !== 'draft') {
+        $this->authorize('update', $campaign);
+
+        if (! $campaign->isEditable()) {
             return redirect()->route('campaigns.show', $id)
                 ->withErrors('Only draft campaigns can be edited.');
         }
 
-        $lists        = ContactList::orderBy('name')->get(['id', 'name']);
-        $smtpAccounts = SmtpAccount::where('status', 'active')->orderBy('name')->get(['id', 'name', 'from_email']);
-
-        return view('campaigns.builder', compact('campaign', 'lists', 'smtpAccounts'));
+        return view('campaigns.builder', [
+            'campaign' => $campaign,
+            'lists' => $this->lists(),
+            'smtpAccounts' => $this->activeSmtpAccounts(),
+        ]);
     }
 
     /** Update a draft campaign. */
-    public function update(Request $request, string $id)
+    public function update(UpdateCampaignRequest $request, string $id): RedirectResponse
     {
         $campaign = Campaign::findOrFail($id);
 
-        if ($campaign->status !== 'draft') {
+        $this->authorize('update', $campaign);
+
+        if (! $campaign->isEditable()) {
             return redirect()->back()->withErrors('Only draft campaigns can be updated.');
         }
 
-        $validated = $request->validate([
-            'name'             => ['required', 'string', 'max:255'],
-            'subject'          => ['required', 'string', 'max:1000'],
-            'list_id'          => ['nullable', 'string', 'exists:contact_lists,id'],
-            'body_html'        => ['nullable', 'string'],
-            'body_text'        => ['nullable', 'string'],
-            'smtp_account_ids' => ['nullable', 'array'],
-            'smtp_account_ids.*' => ['string', 'exists:smtp_accounts,id'],
-        ]);
-
+        $validated = $request->validated();
         $smtpIds = $validated['smtp_account_ids'] ?? [];
         unset($validated['smtp_account_ids']);
 
         $campaign->update($validated);
-
-        if (!empty($smtpIds)) {
-            $campaign->smtpAccounts()->sync($smtpIds);
-        }
+        $campaign->smtpAccounts()->sync($smtpIds);
 
         return redirect()->route('campaigns.show', $id)->with('success', 'Campaign updated.');
     }
 
-    /** 1-Click Smart Retargeting: resend to non-openers */
-    public function retarget(string $id)
+    /**
+     * 1-click smart retargeting: clone the campaign and mark it to skip anyone
+     * who already opened the original. The exclusion is honoured at send time
+     * by DispatchCampaignJob, so the operator can still tweak copy first.
+     */
+    public function retarget(string $id): RedirectResponse
     {
         $campaign = Campaign::findOrFail($id);
 
-        $newCampaign = $campaign->replicate();
-        $newCampaign->name = '[Retarget] ' . $campaign->name;
-        $newCampaign->status = 'draft';
+        $this->authorize('create', Campaign::class);
+
+        $newCampaign = $campaign->replicate(['stats_cache']);
+        $newCampaign->name = '[Retarget] '.$campaign->name;
+        $newCampaign->status = Campaign::STATUS_DRAFT;
+        $newCampaign->scheduled_at = null;
+        $newCampaign->settings = array_merge($campaign->settings ?? [], [
+            'exclude_openers_of' => $campaign->id,
+        ]);
         $newCampaign->save();
 
-        // The list_id is already copied via replicate()
+        $newCampaign->smtpAccounts()->sync($campaign->smtpAccounts->pluck('id')->all());
 
-        // In a real implementation we would attach a scope or filter query to the campaign
-        // to exclude people who opened the previous campaign id. 
-        // For now, we'll mark it as draft so the user can tweak it.
-        
-        return redirect()->route('campaigns.edit', $newCampaign->id)->with('success', 'Retarget campaign drafted. Smart filters (excluding previous openers) will be applied automatically at send time. Tweak the subject line and send!');
+        return redirect()->route('campaigns.edit', $newCampaign->id)
+            ->with('success', 'Retarget draft created — contacts who opened the original campaign will be skipped automatically.');
     }
 
     /** Queue a draft campaign for sending. */
-    public function dispatch(string $id)
+    public function dispatch(string $id): RedirectResponse
     {
         $campaign = Campaign::findOrFail($id);
 
-        if ($campaign->status !== 'draft') {
+        $this->authorize('update', $campaign);
+
+        if ($campaign->status !== Campaign::STATUS_DRAFT) {
             return redirect()->back()->withErrors('Only draft campaigns can be sent.');
         }
 
-        if (!$campaign->list_id) {
+        if (! $campaign->list_id) {
             return redirect()->back()->withErrors('Please assign a contact list before sending.');
         }
 
-        \App\Jobs\DispatchCampaignJob::dispatch($campaign);
+        DispatchCampaignJob::dispatch($campaign);
 
         return redirect()->back()->with('success', 'Campaign has been queued for sending.');
     }
 
     /** Soft-delete a campaign. */
-    public function destroy(string $id)
+    public function destroy(string $id): RedirectResponse
     {
         $campaign = Campaign::findOrFail($id);
 
-        if ($campaign->status === 'sending') {
+        $this->authorize('delete', $campaign);
+
+        if ($campaign->status === Campaign::STATUS_SENDING) {
             return redirect()->back()->withErrors('Cannot delete a campaign that is currently sending.');
         }
 
@@ -162,8 +175,18 @@ class CampaignController extends Controller
 
         return redirect()->route('campaigns.index')->with('success', 'Campaign removed.');
     }
+
+    /** @return \Illuminate\Database\Eloquent\Collection<int, ContactList> */
+    private function lists(): \Illuminate\Database\Eloquent\Collection
+    {
+        return ContactList::orderBy('name')->get(['id', 'name']);
+    }
+
+    /** @return \Illuminate\Database\Eloquent\Collection<int, SmtpAccount> */
+    private function activeSmtpAccounts(): \Illuminate\Database\Eloquent\Collection
+    {
+        return SmtpAccount::where('status', SmtpAccount::STATUS_ACTIVE)
+            ->orderBy('name')
+            ->get(['id', 'name', 'from_email']);
+    }
 }
-
-
-
-

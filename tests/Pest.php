@@ -5,16 +5,15 @@
 | Test Case
 |--------------------------------------------------------------------------
 |
-| The closure you provide to your test functions is always bound to a specific
-| PHPUnit test case class. By default, that class is "PHPUnit\Framework\TestCase".
-| Of course, you may need to change it using the `pest()` function to bind a
-| different class or extend the default test case with traits.
+| Feature tests get a fresh, transaction-wrapped database and the application
+| test case. Unit tests get the application container without touching the
+| database so they stay fast.
 |
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
-    ->in('Feature');
+// RefreshDatabase is applied by Tests\TestCase itself so that plain PHPUnit
+// classes cannot slip through without a migrated database.
+pest()->extend(Tests\TestCase::class)->in('Feature');
 
 pest()->extend(Tests\TestCase::class)->in('Unit');
 
@@ -22,14 +21,47 @@ pest()->extend(Tests\TestCase::class)->in('Unit');
 |--------------------------------------------------------------------------
 | Expectations
 |--------------------------------------------------------------------------
-|
-| When you're writing tests, you often need to check that values meet certain
-| conditions. The "expect()" function gives you access to a set of "expectations"
-| methods that you can use to assert different things.
-|
 */
 
-// Custom expectation: response has security header
-expect()->extend('toHaveSecurityHeader', function (string $header) {
-    return $this->toHaveMethod('assertHeader');
+/**
+ * Assert a response carries a security header with the expected value.
+ *
+ * The previous version returned `toHaveMethod('assertHeader')` — it asserted
+ * that the response object *has a method*, which is true of every response and
+ * therefore never failed. Tests that cannot fail are worse than no tests.
+ */
+expect()->extend('toHaveSecurityHeader', function (string $header, ?string $contains = null) {
+    /** @var Illuminate\Testing\TestResponse $response */
+    $response = $this->value;
+
+    $value = $response->headers->get($header);
+
+    expect($value)->not->toBeNull("Expected response to carry the [{$header}] header.");
+
+    if ($contains !== null) {
+        expect($value)->toContain($contains);
+    }
+
+    return $this;
 });
+
+/*
+|--------------------------------------------------------------------------
+| Helpers
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * Create a signed-in user bound to a fresh tenant, and bind the tenant context
+ * so model global scopes behave exactly as they do behind the middleware.
+ */
+function actingAsTenantUser(array $attributes = []): App\Models\User
+{
+    $user = App\Models\User::factory()->create($attributes);
+
+    App\Tenancy\TenantContext::set($user->tenant);
+
+    test()->actingAs($user);
+
+    return $user;
+}

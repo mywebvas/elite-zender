@@ -49,7 +49,7 @@ class FortifyServiceProvider extends ServiceProvider
             return Limit::perMinute(5)->by($throttleKey)->response(function () {
                 return response()->json([
                     'error' => [
-                        'code'    => 'RATE_LIMITED',
+                        'code' => 'RATE_LIMITED',
                         'message' => 'Too many attempts. Please try again in a moment.',
                     ],
                 ], 429);
@@ -64,7 +64,7 @@ class FortifyServiceProvider extends ServiceProvider
             $credentialId = $request->input('credential.id');
 
             return Limit::perMinute(10)->by(
-                ($credentialId ?: $request->session()->getId()).'|'.$request->ip()
+                ($credentialId ?: $request->session()->getId()).'|'.$request->ip(),
             );
         });
     }

@@ -13,3 +13,5 @@ Disallow: /api/
 Disallow: /t/
 Disallow: /unsubscribe/
 Allow: /
+
+Sitemap: /sitemap.xml

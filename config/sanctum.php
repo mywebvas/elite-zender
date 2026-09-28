@@ -50,7 +50,10 @@ return [
     |
     */
 
-    'expiration' => null,
+    // Non-expiring API tokens are a permanent credential: one leaked value in
+    // a CI log stays valid forever. 30 days by default, overridable per
+    // deployment.
+    'expiration' => env('SANCTUM_TOKEN_TTL_MINUTES', 60 * 24 * 30),
 
     /*
     |--------------------------------------------------------------------------

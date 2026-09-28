@@ -33,7 +33,10 @@ class ImportContactsJob implements ShouldQueue
         public string $storedPath,
         public ?string $listId = null,
         public ?string $userId = null,
-    ) {}
+    ) {
+        // Bulk work: never let a 500k-row import starve a live send.
+        $this->onQueue('low');
+    }
 
     public static function cacheKey(string $importId): string
     {

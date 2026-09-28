@@ -28,7 +28,10 @@ class CheckImapBouncesJob implements ShouldQueue
     /** Messages examined per run — keeps one huge mailbox from starving others. */
     private const BATCH = 200;
 
-    public function __construct(public string $tenantId) {}
+    public function __construct(public string $tenantId)
+    {
+        $this->onQueue('low');
+    }
 
     public function handle(BounceProcessor $processor): void
     {

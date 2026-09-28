@@ -103,6 +103,22 @@ Route::get('/manifest.json', function () {
     return response()->json(json_decode((string) file_get_contents($path), true));
 })->name('manifest');
 
+/*
+ * Sitemap. Only the public marketing surface is listed — the authenticated app
+ * is excluded here and in robots.txt.
+ */
+Route::get('/sitemap.xml', function () {
+    $urls = [
+        ['loc' => url('/'), 'priority' => '1.0', 'changefreq' => 'weekly'],
+        ['loc' => route('login'), 'priority' => '0.5', 'changefreq' => 'monthly'],
+        ['loc' => route('register'), 'priority' => '0.8', 'changefreq' => 'monthly'],
+    ];
+
+    return response()
+        ->view('sitemap', ['urls' => $urls])
+        ->header('Content-Type', 'application/xml');
+})->name('sitemap');
+
 Route::get('/sw.js', function () {
     $path = public_path('sw.js');
 

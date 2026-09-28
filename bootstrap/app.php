@@ -1,6 +1,8 @@
 <?php
 
 use App\Http\Middleware\ForceHttps;
+use App\Http\Middleware\NoStoreForAuthenticated;
+use App\Http\Middleware\PublicApiCors;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
@@ -33,8 +35,12 @@ return Application::configure(basePath: dirname(__DIR__))
         // Tenant context must be bound for BOTH stacks. It used to be web-only,
         // which meant every `auth:sanctum` API request ran with no tenant
         // bound — and therefore with the HasTenant global scope inert.
-        $middleware->web(append: [ResolveTenant::class]);
-        $middleware->api(append: [ResolveTenant::class]);
+        $middleware->web(append: [ResolveTenant::class, NoStoreForAuthenticated::class]);
+        $middleware->api(append: [ResolveTenant::class, NoStoreForAuthenticated::class]);
+
+        $middleware->alias([
+            'public-cors' => PublicApiCors::class,
+        ]);
 
         // RFC 8058 one-click unsubscribe is a cross-origin POST issued by the
         // mail client with no session and no CSRF token. The route is signed,
@@ -43,11 +49,23 @@ return Application::configure(basePath: dirname(__DIR__))
             'unsubscribe/*',
         ]);
 
-        $middleware->trustProxies(at: '*', headers: Request::HEADER_X_FORWARDED_FOR
-            | Request::HEADER_X_FORWARDED_HOST
-            | Request::HEADER_X_FORWARDED_PORT
-            | Request::HEADER_X_FORWARDED_PROTO
-            | Request::HEADER_X_FORWARDED_AWS_ELB);
+        /*
+         * Trusted proxies.
+         *
+         * `at: '*'` means "believe X-Forwarded-For from anybody", which lets a
+         * client forge its own source IP — defeating every IP-keyed rate limit
+         * and poisoning the audit trail. Railway and most PaaS front ends sit
+         * on an unpredictable internal IP, so '*' is the pragmatic default
+         * there, but it MUST be narrowed with TRUSTED_PROXIES on any
+         * deployment where the load-balancer range is known.
+         */
+        $middleware->trustProxies(
+            at: array_values(array_filter(array_map('trim', explode(',', (string) env('TRUSTED_PROXIES', '*'))))),
+            headers: Request::HEADER_X_FORWARDED_FOR
+                | Request::HEADER_X_FORWARDED_HOST
+                | Request::HEADER_X_FORWARDED_PORT
+                | Request::HEADER_X_FORWARDED_PROTO,
+        );
 
         // NOTE: Redis-backed throttling is switched on in AppServiceProvider,
         // not here. This closure runs before the config repository exists, so

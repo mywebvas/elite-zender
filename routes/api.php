@@ -23,8 +23,8 @@ Route::prefix('v1')->group(function (): void {
      * Public — authenticated by an opaque per-form public key, not by a
      * tenant id in the request body.
      */
-    Route::post('leads/capture', [LeadCaptureController::class, 'store'])
-        ->middleware('throttle:30,1')
+    Route::match(['post', 'options'], 'leads/capture', [LeadCaptureController::class, 'store'])
+        ->middleware(['public-cors', 'throttle:30,1'])
         ->name('api.leads.capture');
 
     /*

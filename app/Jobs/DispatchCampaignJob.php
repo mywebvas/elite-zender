@@ -36,7 +36,10 @@ class DispatchCampaignJob implements ShouldBeUnique, ShouldQueue
     /** Uniqueness lock is released as soon as the fan-out finishes. */
     public int $uniqueFor = 3600;
 
-    public function __construct(public Campaign $campaign) {}
+    public function __construct(public Campaign $campaign)
+    {
+        $this->onQueue('high');
+    }
 
     public function uniqueId(): string
     {

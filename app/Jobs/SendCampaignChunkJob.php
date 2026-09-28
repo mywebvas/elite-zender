@@ -42,7 +42,10 @@ class SendCampaignChunkJob implements ShouldQueue
     public function __construct(
         public Campaign $campaign,
         public array $contactIds,
-    ) {}
+    ) {
+        // Sending is the product. It runs ahead of imports and housekeeping.
+        $this->onQueue('high');
+    }
 
     public function handle(SpinSyntaxService $spintax): void
     {

@@ -6,6 +6,39 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — automations, recurring billing and a design-system pass
+
+- **Automations execute.** `app/Automations` adds enrolment, a step runner for
+  all seven types, and a per-minute scheduler. Enrolments are claimed under a
+  row lock with the due time pushed forward before the step runs, so concurrent
+  workers cannot send one person the same email twice. Triggers are wired to
+  contact creation, public lead capture, opens and clicks; bulk CSV import
+  deliberately does not enrol.
+- **Recurring subscriptions.** Paystack (`charge_authorization`) and Stripe
+  (off-session `PaymentIntent`) both store a credential at checkout and renew
+  without the customer returning. Stripe is live the moment its keys are set.
+- **Lifecycle**: trials convert on their own, renewals anchor to the previous
+  period end, dunning retries on a widening 1/3/5-day schedule, lapsing
+  suspends *sending only*, cancellation is undoable in one click, upgrades are
+  prorated and downgrades scheduled for period end.
+- **Design system**: consolidated the two conflicting `@theme` blocks into one,
+  added a single focus-visible treatment, a coherent elevation and motion
+  scale, tabular figures on every statistic, and `<x-banner>` / `<x-stat>`
+  components. Billing state is resolved once per request and shared with every
+  view so notices cannot contradict each other between pages.
+
+### Fixed — found by the new tests
+
+- A wait step parked the enrolment without advancing the cursor, so the same
+  wait ran again when it came due: an automation that waits for ever.
+- `Contact::create()` without an explicit status left the attribute absent in
+  memory, so the subscribe trigger read no status and declined to enrol.
+- `recordPayment()` stored the reusable card credential *before* `settle()`,
+  but `settle()` is what creates the subscription on a first purchase — so no
+  new customer's card was ever saved and their first renewal would have failed.
+- `resources/css/app.css` defined the brand palette and surfaces twice with
+  different values; whichever block loaded last silently won.
+
 ### Fixed — production blockers
 
 - **Campaign sending was impossible.** `CampaignEmail::content()` passed a

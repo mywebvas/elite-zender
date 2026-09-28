@@ -35,10 +35,11 @@ same audience so the next send is cleaner than the last.
 | Bounce + complaint classification, hashed suppression list | ✅ |
 | Smart retargeting (exclude previous openers) | ✅ |
 | REST API v1 (Sanctum) with resource transformers | ✅ |
-| Automations: visual builder + step graph | ⚠️ builder ships; the runtime executor is the next milestone |
+| Automations: builder, runtime engine, 7 step types | ✅ |
 | Billing: plans, invoices, usage limits, refunds | ✅ |
 | Payments: Paystack (NGN + USD), offline bank transfer | ✅ |
-| Payments: Stripe | ⚠️ driver implemented; hidden until `STRIPE_SECRET_KEY` is set |
+| Payments: Stripe (cards saved for automatic renewal) | ✅ |
+| Recurring billing, dunning, proration, cancel/resume | ✅ |
 | Operator console: separate guard, impersonation, plan control | ✅ |
 
 ---
@@ -77,7 +78,8 @@ Key building blocks:
 | `app/Services/BounceClassifier.php` | RFC 3463 DSN classification |
 | `app/Support/UnsubscribeLink.php` | Signed, non-expiring opt-out URLs |
 | `app/Jobs/` | Campaign fan-out, chunked sending, bounce ingestion, imports |
-| `app/Billing/` | Gateways, invoicing state machine, plan limits |
+| `app/Automations/` | Enrolment engine and step runner |
+| `app/Billing/` | Gateways, invoicing state machine, plan limits, dunning |
 | `app/Http/Controllers/Admin/` | Operator console (separate `admin` guard) |
 | `docs/` | Decision log and module specs — **read `docs/README.md` first** |
 
@@ -141,8 +143,9 @@ php artisan queue:work --queue=high,default,low
 php artisan schedule:work       # in production: a single cron entry
 ```
 
-Without the scheduler, daily SMTP quotas never reset, campaigns never move off
-"Sending", and audit logs grow without bound.
+Without the scheduler, automations never advance, subscriptions never renew,
+daily SMTP quotas never reset, campaigns never move off "Sending", and audit
+logs grow without bound.
 
 ---
 

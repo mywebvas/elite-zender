@@ -166,7 +166,7 @@
                 {{-- Page title slot --}}
                 <div class="flex-1 min-w-0">
                     @isset($header)
-                        <h1 class="text-[15px] font-semibold text-slate-900 dark:text-slate-100 truncate">
+                        <h1 class="truncate text-[15px] font-semibold tracking-[-0.012em] text-slate-900 dark:text-slate-100">
                             {{ $header }}
                         </h1>
                     @endisset
@@ -264,6 +264,24 @@
 
             {{-- Page content --}}
             <main class="flex-1 overflow-y-auto pb-24 lg:pb-0" id="main-content" role="main">
+
+                @isset($billingNotice)
+                    @if($billingNotice)
+                        <div class="px-4 pt-4 lg:px-8">
+                            <x-banner :tone="$billingNotice['tone']">
+                                {{ $billingNotice['message'] }}
+                                <x-slot:actions>
+                                    <a href="{{ route('billing.index') }}"
+                                       class="inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-semibold shadow-sm transition hover:bg-white dark:bg-white/10 dark:hover:bg-white/20">
+                                        Go to billing
+                                        <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                                    </a>
+                                </x-slot:actions>
+                            </x-banner>
+                        </div>
+                    @endif
+                @endisset
+
                 <div class="max-w-7xl mx-auto px-4 lg:px-6 py-6">
                     {{ $slot }}
                 </div>

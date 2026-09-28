@@ -110,11 +110,23 @@ re-scoped. Nothing in the locked list above changed.
 
 ### Known gaps, tracked openly
 
-1. **Automations do not execute.** The builder, schema and step allow-list are
-   real; there is no runtime engine walking `contact_automations`. This is the
-   largest remaining feature gap.
-2. **No scoped API tokens.** A Sanctum token carries its owner's full rights.
-3. **No per-tenant encryption key.** All workspaces share `APP_KEY`.
-4. **Billing is not integrated.** Plan tiers exist only as rate-limit inputs.
-5. **`'unsafe-eval'` remains in the CSP** because Alpine compiles `x-*`
+1. **No scoped API tokens.** A Sanctum token carries its owner's full rights.
+2. **No per-tenant encryption key.** All workspaces share `APP_KEY`.
+3. **`'unsafe-eval'` remains in the CSP** because Alpine compiles `x-*`
    expressions at runtime. Removing it means adopting Alpine's CSP build.
+4. **Automation branching is linear.** A `condition` step ends the journey when
+   it does not match, rather than following a second branch. True A/B
+   branching needs a second edge on `automation_steps`.
+5. **Dunning notifications are logged, not emailed.** The retry schedule and
+   the failure reasons are recorded; wiring them to a transactional email
+   template is a small, separate piece of work.
+
+### Closed since the last audit
+
+- **Automations now execute** (`app/Automations`): enrolment, seven step types,
+  a per-minute scheduler, and row-locked claims so concurrent workers cannot
+  double-send.
+- **Billing is fully integrated**: Paystack and Stripe both save a credential
+  at checkout and re-charge it off-session, with a 1/3/5-day dunning schedule,
+  prorated upgrades, period-end downgrades, one-click resume, and suspension
+  that stops sending without touching customer data.

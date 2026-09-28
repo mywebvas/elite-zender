@@ -100,7 +100,17 @@
             <div class="space-y-6">
                 <div>
                     <p class="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">From</p>
-                    <p class="text-sm font-semibold text-slate-900 dark:text-white">{{ $campaign->from_name }} &lt;{{ $campaign->from_email }}&gt;</p>
+                    {{-- Campaigns carry no sender identity of their own: it comes
+                         from whichever relay in the pool sends the message. --}}
+                    @forelse($campaign->smtpAccounts as $relay)
+                        <p class="text-sm font-semibold text-slate-900 dark:text-white">
+                            {{ $relay->from_name }} &lt;{{ $relay->from_email }}&gt;
+                        </p>
+                    @empty
+                        <p class="text-sm font-semibold text-amber-600 dark:text-amber-400">
+                            No SMTP relay assigned
+                        </p>
+                    @endforelse
                 </div>
                 <div>
                     <p class="text-xs text-slate-500 dark:text-slate-400 font-medium mb-1">Subject</p>

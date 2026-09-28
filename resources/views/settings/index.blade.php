@@ -91,7 +91,7 @@
                         <div class="p-6">
                             <form action="/user/two-factor-authentication" method="POST">
                                 @csrf
-                                @if(auth()->user()->two_factor_secret)
+                                @if(auth()->user()->hasEnabledTwoFactorAuthentication())
                                     @method('DELETE')
                                     <x-button type="submit" variant="danger">Disable 2FA</x-button>
                                 @else

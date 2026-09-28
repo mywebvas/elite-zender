@@ -35,13 +35,7 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorAuthenticatable::class);
 
-        Fortify::loginView(function () {
-            return view('auth.login');
-        });
-
-        Fortify::registerView(function () {
-            return view('auth.register');
-        });
+        $this->registerViews();
 
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower((string) $request->input(Fortify::username())).'|'.$request->ip());
@@ -80,6 +74,26 @@ class FortifyServiceProvider extends ServiceProvider
                 ($credentialId ?: $request->session()->getId()).'|'.$request->ip(),
             );
         });
+    }
+
+    /**
+     * Bind a view to every enabled Fortify feature.
+     *
+     * Only the login and register views were bound. Password reset, the
+     * two-factor challenge and password confirmation are all enabled in
+     * config/fortify.php, so each of those routes threw
+     * "Target [...ViewResponse] is not instantiable" — a 500. The two-factor
+     * challenge is the worst of them: enabling 2FA locked the user out of
+     * their own workspace with no way back in.
+     */
+    private function registerViews(): void
+    {
+        Fortify::loginView(fn () => view('auth.login'));
+        Fortify::registerView(fn () => view('auth.register'));
+        Fortify::requestPasswordResetLinkView(fn () => view('auth.forgot-password'));
+        Fortify::resetPasswordView(fn (Request $request) => view('auth.reset-password', ['request' => $request]));
+        Fortify::twoFactorChallengeView(fn () => view('auth.two-factor-challenge'));
+        Fortify::confirmPasswordView(fn () => view('auth.confirm-password'));
     }
 
     /**

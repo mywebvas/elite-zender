@@ -29,6 +29,13 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'role' => 'owner',
             'remember_token' => Str::random(10),
+            // Declared explicitly so a factory-built model carries the same
+            // attribute set as one hydrated from the database. Without them,
+            // Model::preventAccessingMissingAttributes() turns any view that
+            // checks two-factor state into a 500 under test only.
+            'two_factor_secret' => null,
+            'two_factor_recovery_codes' => null,
+            'two_factor_confirmed_at' => null,
         ];
     }
 

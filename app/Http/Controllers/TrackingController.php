@@ -4,122 +4,95 @@ namespace App\Http\Controllers;
 
 use App\Models\Campaign;
 use App\Models\CampaignEvent;
+use App\Models\Tenant;
+use App\Support\SafeRedirect;
+use App\Tenancy\TenantContext;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 
 class TrackingController extends Controller
 {
+    /** Transparent 1×1 GIF served for open tracking. Base64 kept inline to avoid a disk read per pixel. */
+    private const PIXEL = 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+
     /** 1×1 transparent GIF — no auth required, rate-limited at route level. */
-    public function open(Request $request, string $campaign_id, string $contact_id)
+    public function open(Request $request, string $campaign_id, string $contact_id): Response
     {
-        $campaign = Campaign::withoutGlobalScopes()->find($campaign_id);
-
-        if ($campaign) {
-            $tenant = \App\Models\Tenant::find($campaign->tenant_id);
-            \App\Tenancy\TenantContext::set($tenant);
-
+        $this->recordEvent($campaign_id, function (Campaign $campaign) use ($request, $campaign_id, $contact_id): void {
             CampaignEvent::firstOrCreate(
-                ['campaign_id' => $campaign_id, 'contact_id' => $contact_id, 'type' => 'open'],
+                ['campaign_id' => $campaign_id, 'contact_id' => $contact_id, 'type' => CampaignEvent::TYPE_OPEN],
                 [
-                    'tenant_id'  => $campaign->tenant_id,
+                    'tenant_id' => $campaign->tenant_id,
                     'ip_address' => $request->ip(),
-                    'user_agent' => substr($request->userAgent() ?? '', 0, 500),
-                ]
+                    'user_agent' => mb_substr($request->userAgent() ?? '', 0, 500),
+                ],
             );
+        });
 
-            \App\Tenancy\TenantContext::set(null);
-        }
-
-        $gif = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
-
-        return response($gif, 200)
+        return response((string) base64_decode(self::PIXEL, true), 200)
             ->header('Content-Type', 'image/gif')
-            ->header('Cache-Control', 'no-cache, no-store, must-revalidate')
+            ->header('Content-Disposition', 'inline')
+            ->header('Cache-Control', 'no-cache, no-store, must-revalidate, private')
             ->header('Pragma', 'no-cache')
             ->header('Expires', '0');
     }
 
     /** Click relay — validates destination URL before redirecting. */
-    public function click(Request $request, string $campaign_id, string $contact_id)
+    public function click(Request $request, string $campaign_id, string $contact_id): RedirectResponse
     {
-        $rawUrl = $request->query('url');
+        $rawUrl = (string) $request->query('url', '');
 
-        if (!$rawUrl) {
-            return abort(404);
-        }
+        $decodedUrl = $rawUrl === '' ? false : base64_decode($rawUrl, true);
 
-        // Decode Base64-encoded URL
-        $decodedUrl = base64_decode($rawUrl, true);
-
-        // Security: validate it is an absolute HTTP/HTTPS URL
-        if (!$decodedUrl || !$this->isSafeUrl($decodedUrl)) {
+        if ($decodedUrl === false || ! SafeRedirect::isAllowed($decodedUrl)) {
             Log::warning('TrackingController: blocked unsafe redirect', [
-                'raw_url'    => $rawUrl,
-                'decoded'    => $decodedUrl,
-                'ip'         => $request->ip(),
-                'campaign'   => $campaign_id,
+                'raw_url' => mb_substr($rawUrl, 0, 200),
+                'ip' => $request->ip(),
+                'campaign' => $campaign_id,
             ]);
-            return abort(422, 'Invalid redirect URL.');
+
+            abort(422, 'Invalid redirect URL.');
         }
 
-        $campaign = Campaign::withoutGlobalScopes()->find($campaign_id);
-
-        if ($campaign) {
-            $tenant = \App\Models\Tenant::find($campaign->tenant_id);
-            \App\Tenancy\TenantContext::set($tenant);
-
+        $this->recordEvent($campaign_id, function (Campaign $campaign) use ($request, $campaign_id, $contact_id, $decodedUrl): void {
             CampaignEvent::create([
-                'tenant_id'  => $campaign->tenant_id,
+                'tenant_id' => $campaign->tenant_id,
                 'campaign_id' => $campaign_id,
-                'contact_id'  => $contact_id,
-                'type'        => 'click',
-                'url'         => substr($decodedUrl, 0, 1000),
-                'ip_address'  => $request->ip(),
-                'user_agent'  => substr($request->userAgent() ?? '', 0, 500),
+                'contact_id' => $contact_id,
+                'type' => CampaignEvent::TYPE_CLICK,
+                'url' => mb_substr($decodedUrl, 0, 1000),
+                'ip_address' => $request->ip(),
+                'user_agent' => mb_substr($request->userAgent() ?? '', 0, 500),
             ]);
-
-            \App\Tenancy\TenantContext::set(null);
-        }
+        });
 
         return redirect()->away($decodedUrl);
     }
 
     /**
-     * Validates that a URL is an absolute HTTP/HTTPS URL pointing to a
-     * public internet address (blocks SSRF / open-redirect to internal IPs).
+     * Resolve the campaign's tenant, run the writer inside that context and
+     * always restore the previous context.
+     *
+     * The old code called `TenantContext::set(null)` on the happy path only —
+     * any exception (or an early return) left the tenant bound, which under
+     * Octane means the *next* request on that worker inherits it.
+     *
+     * @param  callable(Campaign): void  $writer
      */
-    private function isSafeUrl(string $url): bool
+    private function recordEvent(string $campaignId, callable $writer): void
     {
-        if (!filter_var($url, FILTER_VALIDATE_URL)) {
-            return false;
+        $campaign = Campaign::withoutGlobalScopes()->find($campaignId);
+
+        if ($campaign === null) {
+            // Unknown campaign: still return a valid pixel/redirect so we never
+            // confirm or deny the existence of an id to a scanner.
+            return;
         }
 
-        $parsed = parse_url($url);
+        $tenant = Tenant::find($campaign->tenant_id);
 
-        // Must be http or https
-        if (!isset($parsed['scheme']) || !in_array(strtolower($parsed['scheme']), ['http', 'https'])) {
-            return false;
-        }
-
-        $host = strtolower($parsed['host'] ?? '');
-
-        // Block localhost and loopback
-        if (in_array($host, ['localhost', '127.0.0.1', '::1', '0.0.0.0'])) {
-            return false;
-        }
-
-        // Block private/link-local IP ranges (SSRF protection)
-        if (filter_var($host, FILTER_VALIDATE_IP)) {
-            if (
-                filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false
-            ) {
-                return false;
-            }
-        }
-
-        return true;
+        TenantContext::run($tenant, fn () => $writer($campaign));
     }
 }
-
-
-

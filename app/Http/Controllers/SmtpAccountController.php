@@ -2,41 +2,67 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\SmtpAccount;
 use App\Http\Requests\StoreSmtpAccountRequest;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Crypt;
+use App\Models\SmtpAccount;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class SmtpAccountController extends Controller
 {
-    public function index()
+    public function index(): View
     {
+        $this->authorize('viewAny', SmtpAccount::class);
+
         $accounts = SmtpAccount::latest()->get();
+
         return view('smtp.index', compact('accounts'));
     }
 
-    public function store(StoreSmtpAccountRequest $request)
+    public function store(StoreSmtpAccountRequest $request): RedirectResponse
     {
+        $this->authorize('create', SmtpAccount::class);
+
         $data = $request->validated();
-        if (!empty($data['password'])) { $data['password'] = Crypt::encryptString($data['password']); }
+
+        // NOTE: `SmtpAccount::$casts` declares `password => encrypted`, so the
+        // model encrypts on write and decrypts on read. Encrypting here as well
+        // would store a double-wrapped value and every SMTP handshake would
+        // authenticate with ciphertext.
+        if (blank($data['password'] ?? null)) {
+            unset($data['password']);
+        }
+
         SmtpAccount::create($data);
-        return redirect()->route('smtp-accounts.index')->with('success', 'SMTP Account added successfully.');
+
+        return redirect()->route('smtp-accounts.index')->with('success', 'SMTP account added successfully.');
     }
 
-    public function update(StoreSmtpAccountRequest $request, string $id)
+    public function update(StoreSmtpAccountRequest $request, string $id): RedirectResponse
     {
         $smtpAccount = SmtpAccount::findOrFail($id);
+
+        $this->authorize('update', $smtpAccount);
+
         $data = $request->validated();
-        if (!empty($data['password'])) { $data['password'] = Crypt::encryptString($data['password']); }
-        else { unset($data['password']); }
+
+        // An empty password field means "leave the stored credential alone".
+        if (blank($data['password'] ?? null)) {
+            unset($data['password']);
+        }
+
         $smtpAccount->update($data);
-        return redirect()->route('smtp-accounts.index')->with('success', 'SMTP Account updated successfully.');
+
+        return redirect()->route('smtp-accounts.index')->with('success', 'SMTP account updated successfully.');
     }
 
-    public function destroy(string $id)
+    public function destroy(string $id): RedirectResponse
     {
-        SmtpAccount::findOrFail($id)->delete();
-        return redirect()->route('smtp-accounts.index')->with('success', 'SMTP Account removed.');
+        $smtpAccount = SmtpAccount::findOrFail($id);
+
+        $this->authorize('delete', $smtpAccount);
+
+        $smtpAccount->delete();
+
+        return redirect()->route('smtp-accounts.index')->with('success', 'SMTP account removed.');
     }
 }
-

@@ -1,5 +1,7 @@
 <?php
 
+use App\Http\Controllers\Api\LeadCaptureController;
+use App\Http\Controllers\Api\V1;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -10,44 +12,63 @@ use Illuminate\Support\Facades\Route;
 |
 | Base: /api/v1/  (see docs/05-API-CONTRACT.md)
 | Auth: Sanctum cookie (SPA) + Bearer token (external clients)
-| Rate limits registered in AppServiceProvider::boot()
+| Tenancy: App\Http\Middleware\ResolveTenant is applied to the api group in
+|          bootstrap/app.php, so every query below is tenant-scoped.
+| Limits:  rate limiters registered in AppServiceProvider::boot()
 |
 */
 
-// Fortify handles auth routes. If API tokens are used later, they use Sanctum's createToken.
+Route::prefix('v1')->group(function (): void {
+    /*
+     * Public — authenticated by an opaque per-form public key, not by a
+     * tenant id in the request body.
+     */
+    Route::match(['post', 'options'], 'leads/capture', [LeadCaptureController::class, 'store'])
+        ->middleware(['public-cors', 'throttle:30,1'])
+        ->name('api.leads.capture');
 
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
-Route::prefix('v1')->middleware('throttle:60,1')->group(function () {
-    Route::post('leads/capture', [\App\Http\Controllers\Api\LeadCaptureController::class, 'store']);
-});
+    /*
+     * Authenticated, tenant-scoped, plan-tiered rate limit.
+     */
+    Route::middleware(['auth:sanctum', 'throttle:api'])->group(function (): void {
+        Route::get('me', fn (Request $request) => response()->json([
+            'data' => [
+                'user' => [
+                    'id' => $request->user()->getKey(),
+                    'name' => $request->user()->name,
+                    'email' => $request->user()->email,
+                    'role' => $request->user()->role,
+                ],
+                'tenant' => [
+                    'id' => $request->user()->tenant_id,
+                    'name' => $request->user()->tenant?->name,
+                ],
+            ],
+        ]))->name('api.me');
 
-// ---------------------------------------------------------------------------
-// Authenticated API — tenant-scoped, plan-tiered rate limit
-// ---------------------------------------------------------------------------
-Route::prefix('v1')
-    ->middleware(['auth:sanctum', 'throttle:api'])
-    ->group(function () {
-        // Health / ping
+        // Lightweight connectivity probe for integrators.
         Route::get('ping', fn (Request $request) => response()->json([
             'data' => [
-                'user'   => $request->user()?->id,
+                'pong' => true,
+                'user' => $request->user()?->getKey(),
                 'tenant' => $request->user()?->tenant_id,
             ],
-        ]));
+        ]))->name('api.ping');
 
-        // Onboarding (M1 stub — returns 501 until implemented)
-        Route::get('onboarding/status', fn () => response()->json(['message' => 'Not implemented'], 501));
+        Route::apiResource('campaigns', V1\CampaignController::class)
+            ->only(['index', 'show'])
+            ->names('api.campaigns');
 
-        // Campaigns (M4 Campaigns module)
-        Route::apiResource('campaigns', \App\Http\Controllers\Controller::class)
-            ->only([])
-            ->names('campaigns');
+        Route::apiResource('contacts', V1\ContactController::class)
+            ->only(['index', 'show', 'store', 'destroy'])
+            ->names('api.contacts');
 
-        // SMTP Accounts (M2 SMTP Pool module)
-        // Route::apiResource('smtp-accounts', SmtpAccountController::class);
+        Route::apiResource('lists', V1\ContactListController::class)
+            ->only(['index', 'show'])
+            ->names('api.lists');
 
-        // Contacts (M3 Contacts module)
-        // Route::apiResource('contacts', ContactController::class);
+        Route::apiResource('smtp-accounts', V1\SmtpAccountController::class)
+            ->only(['index', 'show'])
+            ->names('api.smtp-accounts');
     });
+});

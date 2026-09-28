@@ -1,90 +1,135 @@
 <?php
 
-use Illuminate\Support\Facades\Auth;
+use App\Http\Controllers\AutomationController;
+use App\Http\Controllers\BounceController;
+use App\Http\Controllers\CampaignController;
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\ContactListController;
+use App\Http\Controllers\CsvImportController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\SettingsController;
+use App\Http\Controllers\SmtpAccountController;
+use App\Http\Controllers\TrackingController;
+use App\Http\Controllers\UnsubscribeController;
 use Illuminate\Support\Facades\Route;
 
-// Root: redirect based on auth state
+/*
+|--------------------------------------------------------------------------
+| Public
+|--------------------------------------------------------------------------
+*/
+
+// Marketing landing page. Signed-in users go straight to their workspace so
+// the "logged in but staring at a signup CTA" dead end never happens.
 Route::get('/', function () {
-    return view('welcome');
+    return auth()->check()
+        ? redirect()->route('dashboard')
+        : view('welcome');
 })->name('welcome');
 
-// Offline fallback — served by service worker when network unavailable
-Route::get('/offline', function () {
-    return view('offline');
-})->name('offline');
+// Offline fallback — served by the service worker when the network is down.
+Route::view('/offline', 'offline')->name('offline');
 
-// Tracking Endpoints - rate limited to 60 per minute per IP
-Route::middleware('throttle:60,1')->group(function () {
-    Route::get('/t/o/{campaign}/{contact}', [\App\Http\Controllers\TrackingController::class, 'open'])->name('tracking.open');
-    Route::get('/t/c/{campaign}/{contact}', [\App\Http\Controllers\TrackingController::class, 'click'])->name('tracking.click');
-    
-    // Unsubscribe (GET for users, POST for RFC 8058 1-click)
-    Route::match(['get', 'post'], '/unsubscribe/{campaign}/{contact}', \App\Http\Controllers\UnsubscribeController::class)->name('unsubscribe');
+/*
+|--------------------------------------------------------------------------
+| Email engagement endpoints (no session, hit by mail clients)
+|--------------------------------------------------------------------------
+*/
+
+Route::middleware('throttle:tracking')->group(function (): void {
+    Route::get('/t/o/{campaign}/{contact}', [TrackingController::class, 'open'])->name('tracking.open');
+    Route::get('/t/c/{campaign}/{contact}', [TrackingController::class, 'click'])->name('tracking.click');
 });
 
-Route::middleware('auth')->group(function () {
-    Route::get('/dashboard', function () {
-        return view('dashboard');
-    })->name('dashboard');
+// Signed so a link cannot be forged or replayed against another recipient.
+// GET renders a confirmation page only; POST performs the opt-out (RFC 8058).
+Route::match(['get', 'post'], '/unsubscribe/{campaign}/{contact}', UnsubscribeController::class)
+    ->middleware(['throttle:tracking', 'signed'])
+    ->name('unsubscribe');
 
-    // Onboarding Wizard
-    Route::get('/onboarding', function () {
-        return view('onboarding');
-    })->name('onboarding');
+/*
+|--------------------------------------------------------------------------
+| Authenticated application
+|--------------------------------------------------------------------------
+*/
 
-    // Campaigns Builder UI
-    Route::post('campaigns/{campaign}/dispatch', [\App\Http\Controllers\CampaignController::class, 'dispatch'])->name('campaigns.dispatch');
-    Route::post('campaigns/{campaign}/retarget', [\App\Http\Controllers\CampaignController::class, 'retarget'])->name('campaigns.retarget');
-    Route::resource('campaigns', \App\Http\Controllers\CampaignController::class);
+Route::middleware(['auth'])->group(function (): void {
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
-    // Automations UI
-    Route::resource('automations', \App\Http\Controllers\AutomationController::class);
+    Route::get('/onboarding', OnboardingController::class)->name('onboarding');
 
-    // SMTP Manager UI
-    Route::resource('smtp-accounts', \App\Http\Controllers\SmtpAccountController::class)->except(['create', 'edit', 'show']);
-    
-    Route::resource('lists', \App\Http\Controllers\ContactListController::class)->except(['create', 'edit', 'show']);
-    Route::resource('contacts', \App\Http\Controllers\ContactController::class)->except(['create', 'edit', 'show']);
-    
-    // Rate limit CSV imports to 10 per minute to prevent DoS
-    Route::post('contacts/import', [\App\Http\Controllers\CsvImportController::class, 'store'])
-        ->middleware('throttle:10,1')
+    // Campaigns
+    Route::post('campaigns/{campaign}/dispatch', [CampaignController::class, 'dispatch'])
+        ->middleware('throttle:campaign-dispatch')
+        ->name('campaigns.dispatch');
+    Route::post('campaigns/{campaign}/retarget', [CampaignController::class, 'retarget'])->name('campaigns.retarget');
+    Route::post('campaigns/{campaign}/test-send', [CampaignController::class, 'testSend'])
+        ->middleware('throttle:campaign-dispatch')
+        ->name('campaigns.test-send');
+    Route::post('campaigns/preview', [CampaignController::class, 'preview'])->name('campaigns.preview');
+    Route::resource('campaigns', CampaignController::class);
+
+    // Automations
+    Route::resource('automations', AutomationController::class);
+
+    // SMTP pool
+    Route::resource('smtp-accounts', SmtpAccountController::class)->except(['create', 'edit', 'show']);
+
+    // Audience
+    Route::resource('lists', ContactListController::class)->except(['create', 'edit', 'show']);
+    Route::resource('contacts', ContactController::class)->except(['create', 'edit', 'show']);
+
+    Route::post('contacts/import', [CsvImportController::class, 'store'])
+        ->middleware('throttle:csv-import')
         ->name('contacts.import');
+    Route::get('contacts/import/{import}', [CsvImportController::class, 'show'])->name('contacts.import.status');
 
-    Route::get('/bounces', function () {
-        return view('bounces.index');
-    })->name('bounces.index');
+    Route::get('/bounces', BounceController::class)->name('bounces.index');
 
-
-    Route::get('/settings', function () {
-        return view('settings.index');
-    })->name('settings.index');
-
-    Route::post('/settings', function (\Illuminate\Http\Request $request) {
-        $request->validate(['workspace_name' => 'sometimes|string|max:255', 'timezone' => 'sometimes|string|max:100']);
-        // In a real app, save to tenant settings. For now flash success.
-        return back()->with('success', 'Settings saved successfully.');
-    })->name('settings.update');
+    Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.index');
+    Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
 });
 
-// PWA static assets — serve from public/ with correct content-type
-// In production these are served by the web server directly (nginx/caddy).
-// Routes exist so the test HTTP client can hit them in the test suite.
+/*
+|--------------------------------------------------------------------------
+| PWA assets
+|--------------------------------------------------------------------------
+| In production nginx serves these straight from public/. The routes exist so
+| the HTTP test client (and `php artisan serve`) resolve them identically.
+*/
+
 Route::get('/manifest.json', function () {
     $path = public_path('manifest.json');
-    if (!file_exists($path)) {
-        abort(404);
-    }
-    return response()->json(
-        json_decode(file_get_contents($path), true),
-        200,
-        ['Content-Type' => 'application/json']
-    );
+
+    abort_unless(file_exists($path), 404);
+
+    return response()->json(json_decode((string) file_get_contents($path), true));
 })->name('manifest');
+
+/*
+ * Sitemap. Only the public marketing surface is listed — the authenticated app
+ * is excluded here and in robots.txt.
+ */
+Route::get('/sitemap.xml', function () {
+    $urls = [
+        ['loc' => url('/'), 'priority' => '1.0', 'changefreq' => 'weekly'],
+        ['loc' => route('login'), 'priority' => '0.5', 'changefreq' => 'monthly'],
+        ['loc' => route('register'), 'priority' => '0.8', 'changefreq' => 'monthly'],
+    ];
+
+    return response()
+        ->view('sitemap', ['urls' => $urls])
+        ->header('Content-Type', 'application/xml');
+})->name('sitemap');
 
 Route::get('/sw.js', function () {
     $path = public_path('sw.js');
-    return response()->file($path, ['Content-Type' => 'application/javascript']);
+
+    abort_unless(file_exists($path), 404);
+
+    return response()->file($path, [
+        'Content-Type' => 'application/javascript',
+        'Service-Worker-Allowed' => '/',
+    ]);
 })->name('sw');
-
-

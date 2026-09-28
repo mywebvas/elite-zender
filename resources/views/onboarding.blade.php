@@ -53,7 +53,7 @@
                         </div>
                     </div>
                     <div class="flex justify-end gap-3 mt-6">
-                        <x-button type="submit" variant="primary" :disabled="testingSmtp">
+                        <x-button type="submit" variant="primary" ::disabled="testingSmtp">
                             <span x-show="!testingSmtp">Connect & Continue</span>
                             <span x-show="testingSmtp">Testing...</span>
                         </x-button>
@@ -84,7 +84,7 @@
                 
                 <div class="flex justify-between mt-6">
                     <x-button type="button" variant="ghost" @click="currentStep = 0">Back</x-button>
-                    <x-button type="button" variant="primary" @click="importContacts" :disabled="!fileName || importing">
+                    <x-button type="button" variant="primary" @click="importContacts" ::disabled="!fileName || importing">
                         <span x-show="!importing">Import & Continue</span>
                         <span x-show="importing">Importing...</span>
                     </x-button>

@@ -63,6 +63,7 @@ return [
             'path' => storage_path('logs/laravel.log'),
             'level' => env('LOG_LEVEL', 'debug'),
             'replace_placeholders' => true,
+            'processors' => [App\Logging\TenantContextProcessor::class],
         ],
 
         'daily' => [
@@ -71,6 +72,7 @@ return [
             'level' => env('LOG_LEVEL', 'debug'),
             'max_files' => env('LOG_DAILY_DAYS', 14),
             'replace_placeholders' => true,
+            'processors' => [App\Logging\TenantContextProcessor::class],
         ],
 
         'monthly' => [
@@ -102,6 +104,12 @@ return [
             'processors' => [PsrLogMessageProcessor::class],
         ],
 
+        /*
+         * Container/PaaS channel. JSON by default so the platform's log
+         * shipper can index the fields instead of regex-scraping a line, and
+         * every record carries the tenant it belongs to — without that, a
+         * multi-tenant log tells you an SMTP relay is failing but not whose.
+         */
         'stderr' => [
             'driver' => 'monolog',
             'level' => env('LOG_LEVEL', 'debug'),
@@ -109,8 +117,11 @@ return [
             'handler_with' => [
                 'stream' => 'php://stderr',
             ],
-            'formatter' => env('LOG_STDERR_FORMATTER'),
-            'processors' => [PsrLogMessageProcessor::class],
+            'formatter' => env('LOG_STDERR_FORMATTER', Monolog\Formatter\JsonFormatter::class),
+            'processors' => [
+                PsrLogMessageProcessor::class,
+                App\Logging\TenantContextProcessor::class,
+            ],
         ],
 
         'syslog' => [

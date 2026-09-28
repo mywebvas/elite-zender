@@ -135,7 +135,15 @@ return [
     ],
 
     'flush' => [
-        //
+        /*
+         * The current tenant is bound as a container *instance*
+         * (App\Tenancy\TenantContext). Under Octane the container survives
+         * between requests, so a binding left behind by an aborted request
+         * would silently scope the *next* request — including an
+         * unauthenticated one — to the previous workspace. ResolveTenant
+         * already restores it in a `finally`; this is the belt to that brace.
+         */
+        App\Tenancy\TenantContext::CONTAINER_KEY,
     ],
 
     /*

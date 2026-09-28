@@ -2,37 +2,42 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
+use App\Http\Requests\StoreContactListRequest;
+use App\Models\ContactList;
+use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class ContactListController extends Controller
 {
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
+    public function index(): View
     {
-        $lists = \App\Models\ContactList::withCount('contacts')->latest()->get();
+        $this->authorize('viewAny', ContactList::class);
+
+        $lists = ContactList::withCount([
+            'contacts',
+            'contacts as active_contacts_count' => fn ($q) => $q->where('contacts.status', \App\Models\Contact::STATUS_ACTIVE),
+        ])->latest()->get();
+
         return view('lists.index', compact('lists'));
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(\App\Http\Requests\StoreContactListRequest $request)
+    public function store(StoreContactListRequest $request): RedirectResponse
     {
-        \App\Models\ContactList::create($request->validated());
-        
+        $this->authorize('create', ContactList::class);
+
+        ContactList::create($request->validated());
+
         return redirect()->route('lists.index')->with('success', 'List created successfully.');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy(string $id): RedirectResponse
     {
-        $list = \App\Models\ContactList::findOrFail($id);
+        $list = ContactList::findOrFail($id);
+
+        $this->authorize('delete', $list);
+
         $list->delete();
-        
+
         return redirect()->route('lists.index')->with('success', 'List deleted successfully.');
     }
 }

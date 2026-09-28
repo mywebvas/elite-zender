@@ -11,10 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('contact_contact_list', function (Blueprint $table) {
+        Schema::create('contact_contact_list', function (Blueprint $table): void {
             $table->foreignUuid('contact_id')->constrained()->cascadeOnDelete();
             $table->foreignUuid('contact_list_id')->constrained()->cascadeOnDelete();
-            
+
             $table->primary(['contact_id', 'contact_list_id']);
         });
     }

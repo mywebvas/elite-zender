@@ -3,9 +3,9 @@
 use App\Models\ContactList;
 use App\Models\User;
 
-test('a user can view their lists', function () {
+test('a user can view their lists', function (): void {
     $user = User::factory()->create();
-    
+
     ContactList::factory()->create(['tenant_id' => $user->tenant_id, 'name' => 'My List']);
 
     $this->actingAs($user)
@@ -14,7 +14,7 @@ test('a user can view their lists', function () {
         ->assertSee('My List');
 });
 
-test('a user can create a list', function () {
+test('a user can create a list', function (): void {
     $user = User::factory()->create();
 
     $this->actingAs($user)
@@ -29,7 +29,7 @@ test('a user can create a list', function () {
     ]);
 });
 
-test('a user can delete a list', function () {
+test('a user can delete a list', function (): void {
     $user = User::factory()->create();
     $list = ContactList::factory()->create(['tenant_id' => $user->tenant_id]);
 

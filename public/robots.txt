@@ -1,2 +1,17 @@
 User-agent: *
-Disallow:
+# The app itself is private; only the marketing surface should be indexed.
+Disallow: /dashboard
+Disallow: /campaigns
+Disallow: /contacts
+Disallow: /lists
+Disallow: /automations
+Disallow: /smtp-accounts
+Disallow: /settings
+Disallow: /bounces
+Disallow: /onboarding
+Disallow: /api/
+Disallow: /t/
+Disallow: /unsubscribe/
+Allow: /
+
+Sitemap: /sitemap.xml

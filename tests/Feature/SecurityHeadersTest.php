@@ -4,23 +4,22 @@
  * SecurityHeaders middleware — verifies all required headers are injected.
  * Spec: docs/06-SECURITY-COMPLIANCE.md §1 Application security.
  */
-
-it('injects X-Frame-Options DENY on every web response', function () {
+it('injects X-Frame-Options DENY on every web response', function (): void {
     $response = $this->get('/offline');
     $response->assertHeader('X-Frame-Options', 'DENY');
 });
 
-it('injects X-Content-Type-Options nosniff', function () {
+it('injects X-Content-Type-Options nosniff', function (): void {
     $response = $this->get('/offline');
     $response->assertHeader('X-Content-Type-Options', 'nosniff');
 });
 
-it('injects Referrer-Policy header', function () {
+it('injects Referrer-Policy header', function (): void {
     $response = $this->get('/offline');
     $response->assertHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
 });
 
-it('injects Content-Security-Policy header', function () {
+it('injects Content-Security-Policy header', function (): void {
     $response = $this->get('/offline');
     $response->assertHeader('Content-Security-Policy');
     // Must include default-src 'self'
@@ -28,7 +27,7 @@ it('injects Content-Security-Policy header', function () {
         ->toContain("default-src 'self'");
 });
 
-it('injects Strict-Transport-Security header', function () {
+it('injects Strict-Transport-Security header', function (): void {
     $response = $this->get('/offline');
     $response->assertHeader('Strict-Transport-Security');
     expect($response->headers->get('Strict-Transport-Security'))
@@ -36,18 +35,18 @@ it('injects Strict-Transport-Security header', function () {
         ->toContain('includeSubDomains');
 });
 
-it('injects Permissions-Policy header', function () {
+it('injects Permissions-Policy header', function (): void {
     $response = $this->get('/offline');
     $response->assertHeader('Permissions-Policy');
 });
 
-it('removes X-Powered-By fingerprinting header', function () {
+it('removes X-Powered-By fingerprinting header', function (): void {
     $response = $this->get('/offline');
     // Header should not be present
     expect($response->headers->has('X-Powered-By'))->toBeFalse();
 });
 
-it('applies security headers to API routes', function () {
+it('applies security headers to API routes', function (): void {
     $response = $this->getJson('/api/v1/ping');
     $response->assertHeader('X-Frame-Options', 'DENY');
     $response->assertHeader('X-Content-Type-Options', 'nosniff');

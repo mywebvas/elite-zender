@@ -4,12 +4,12 @@
  * Rate limiting — verifies throttle guards fire correctly.
  * Spec: docs/05-API-CONTRACT.md §3 Rate Limiting.
  */
-beforeEach(function () {
-    $this->withoutMiddleware(\Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
+beforeEach(function (): void {
+    $this->withoutMiddleware(Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class);
 });
 
-it('allows up to 60 api requests per minute for starter plan before throttling', function () {
-    $user = \App\Models\User::factory()->create();
+it('allows up to 60 api requests per minute for starter plan before throttling', function (): void {
+    $user = App\Models\User::factory()->create();
     $this->actingAs($user);
 
     for ($i = 0; $i < 60; $i++) {
@@ -23,8 +23,8 @@ it('allows up to 60 api requests per minute for starter plan before throttling',
     ]);
 });
 
-it('returns RATE_LIMITED error code in JSON on throttle', function () {
-    $user = \App\Models\User::factory()->create();
+it('returns RATE_LIMITED error code in JSON on throttle', function (): void {
+    $user = App\Models\User::factory()->create();
     $this->actingAs($user);
 
     for ($i = 0; $i < 60; $i++) {
@@ -33,5 +33,5 @@ it('returns RATE_LIMITED error code in JSON on throttle', function () {
 
     $response = $this->getJson('/api/v1/ping');
     $response->assertStatus(429)
-             ->assertJsonPath('error.code', 'RATE_LIMITED');
+        ->assertJsonPath('error.code', 'RATE_LIMITED');
 });

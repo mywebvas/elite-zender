@@ -12,14 +12,18 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('smtp_accounts', function (Blueprint $table) {
+        Schema::create('smtp_accounts', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->uuid('tenant_id')->index();
             $table->string('name');
             $table->string('host');
             $table->unsignedSmallInteger('port')->default(587);
-            $table->string('username');
-            $table->text('password'); // AES-256-GCM encrypted via Laravel Crypt
+            // Nullable: relays that authenticate by source IP (or an internal
+            // MTA) legitimately have no credentials. The validation rules
+            // already allowed this, so a NOT NULL column turned a valid
+            // submission into a 500.
+            $table->string('username')->nullable();
+            $table->text('password')->nullable(); // AES-256-GCM encrypted via Laravel Crypt
             $table->string('encryption', 10)->default('tls'); // tls | ssl | none
             $table->string('from_email');
             $table->string('from_name');
@@ -32,6 +36,9 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->foreign('tenant_id')->references('id')->on('tenants')->cascadeOnDelete();
+
+            // Powers SmtpPool's "sendable relays" query.
+            $table->index(['tenant_id', 'status', 'health_score']);
         });
     }
 

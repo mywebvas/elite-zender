@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('campaign_events', function (Blueprint $table) {
+        Schema::create('campaign_events', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->uuid('tenant_id')->index();
             $table->uuid('campaign_id')->index();

@@ -1,4 +1,4 @@
-﻿@props([
+@props([
     'padding' => true,
     'variant' => 'default',
     'class'   => '',

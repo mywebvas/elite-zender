@@ -42,6 +42,17 @@ return [
             'driver' => 'session',
             'provider' => 'users',
         ],
+
+        /*
+         * Sanctum guard — used by routes/api.php. It authenticates first-party
+         * SPA requests via the session cookie and third-party clients via a
+         * Bearer personal access token. Without this entry every `auth:sanctum`
+         * route throws "Auth guard [sanctum] is not defined" (HTTP 500).
+         */
+        'sanctum' => [
+            'driver' => 'sanctum',
+            'provider' => 'users',
+        ],
     ],
 
     /*

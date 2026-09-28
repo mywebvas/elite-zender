@@ -18,7 +18,7 @@
         <div>
             <div class="flex items-center justify-between mb-2">
                 <label for="password" class="input-label mb-0">Password</label>
-                <a href="#" @click.prevent="window.$toast('Password reset is not available in this version.', 'info')" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">Forgot password?</a>
+                <a href="{{ route('password.request') }}" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 hover:underline">Forgot password?</a>
             </div>
             <input id="password" name="password" type="password" autocomplete="current-password" required
                    class="input @error('password') ring-rose-400 dark:ring-rose-500 @enderror"

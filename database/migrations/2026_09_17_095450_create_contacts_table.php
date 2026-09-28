@@ -11,7 +11,7 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('contacts', function (Blueprint $table) {
+        Schema::create('contacts', function (Blueprint $table): void {
             $table->uuid('id')->primary();
             $table->foreignUuid('tenant_id')->constrained()->cascadeOnDelete();
             $table->string('email')->index();
@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('status')->default('active'); // active, unsubscribed, bounced, spam
             $table->json('custom_fields')->nullable();
             $table->timestamps();
-            
+
             // An email should only exist once per tenant globally
             $table->unique(['tenant_id', 'email']);
         });

@@ -2,111 +2,73 @@
 
 namespace App\Http\Controllers;
 
+use App\Jobs\ImportContactsJob;
+use App\Models\Contact;
+use App\Tenancy\TenantContext;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 class CsvImportController extends Controller
 {
-    public function store(\Illuminate\Http\Request $request)
+    /**
+     * Accept the upload, hand it to a queue worker and return immediately.
+     *
+     * Parsing used to happen inline inside one giant transaction, which meant a
+     * large file could hold an HTTP worker (and a DB write lock) hostage for
+     * minutes and eventually time out with a half-applied import.
+     */
+    public function store(Request $request): RedirectResponse
     {
-        $request->validate([
-            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:10240'], // 10MB max
-            'list_id' => ['nullable', 'exists:contact_lists,id'],
+        $this->authorize('create', Contact::class);
+
+        $validated = $request->validate([
+            'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:20480'], // 20 MB
+            'list_id' => [
+                'nullable',
+                'string',
+                Rule::exists('contact_lists', 'id')
+                    ->where('tenant_id', TenantContext::id())
+                    ->whereNull('deleted_at'),
+            ],
         ]);
 
-        $file = $request->file('csv_file');
-        $path = $file->getRealPath();
-        
-        $handle = fopen($path, 'r');
-        $header = fgetcsv($handle); // Assuming first row is header
-        
-        if (!$header) {
-            return redirect()->back()->with('error', 'Invalid CSV file format.');
+        $importId = (string) Str::uuid7();
+
+        $storedPath = $request->file('csv_file')->storeAs(
+            'imports/'.TenantContext::id(),
+            $importId.'.csv',
+            'local',
+        );
+
+        if ($storedPath === false) {
+            return redirect()->back()->with('error', 'Could not store the uploaded file. Please try again.');
         }
 
-        // Map columns based on standard names
-        $emailIdx = $this->getColumnIndex($header, ['email', 'email address', 'e-mail']);
-        if ($emailIdx === false) {
-            return redirect()->back()->with('error', 'CSV must contain an "email" column.');
-        }
-        
-        $firstNameIdx = $this->getColumnIndex($header, ['first name', 'firstname', 'first_name', 'name', 'first']);
-        $lastNameIdx = $this->getColumnIndex($header, ['last name', 'lastname', 'last_name', 'last']);
+        ImportContactsJob::dispatch(
+            importId: $importId,
+            tenantId: (string) TenantContext::id(),
+            storedPath: $storedPath,
+            listId: $validated['list_id'] ?? null,
+            userId: (string) $request->user()?->getKey(),
+        );
 
-        $tenantId = \App\Tenancy\TenantContext::id();
-        $listId = $request->input('list_id');
-        $now = now();
-        
-        $imported = 0;
-        $duplicates = 0;
-        
-        \Illuminate\Support\Facades\DB::beginTransaction();
-        
-        try {
-            while (($row = fgetcsv($handle)) !== false) {
-                if (!isset($row[$emailIdx]) || empty(trim($row[$emailIdx]))) {
-                    continue;
-                }
-                
-                $email = strtolower(trim($row[$emailIdx]));
-                if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
-                    continue; // Skip invalid emails
-                }
-                
-                // Live MX Validation
-                $domain = substr(strrchr($email, "@"), 1);
-                if (!checkdnsrr($domain, 'MX')) {
-                    continue; // Skip emails with invalid domains (Bounce Shield)
-                }
-
-                // Fast insert or ignore (for duplicates)
-                // We use firstOrCreate so we can attach to list if it already exists
-                $contact = \App\Models\Contact::firstOrCreate(
-                    ['tenant_id' => $tenantId, 'email' => $email],
-                    [
-                        'first_name' => $firstNameIdx !== false && isset($row[$firstNameIdx]) ? trim($row[$firstNameIdx]) : null,
-                        'last_name' => $lastNameIdx !== false && isset($row[$lastNameIdx]) ? trim($row[$lastNameIdx]) : null,
-                        'status' => 'active',
-                    ]
-                );
-                
-                if ($contact->wasRecentlyCreated) {
-                    $imported++;
-                } else {
-                    $duplicates++;
-                }
-                
-                if ($listId) {
-                    // Sync without detaching to safely add to list
-                    $contact->lists()->syncWithoutDetaching([$listId]);
-                }
-            }
-            
-            \Illuminate\Support\Facades\DB::commit();
-            fclose($handle);
-            
-            return redirect()->back()->with('success', "Import complete! Added $imported new contacts. (Skipped $duplicates duplicates).");
-            
-        } catch (\Exception $e) {
-            \Illuminate\Support\Facades\DB::rollBack();
-            fclose($handle);
-            // Log full exception internally; never expose raw errors to users
-            \Illuminate\Support\Facades\Log::error('CSV import failed', [
-                'user_id' => auth()->id(),
-                'list_id' => $listId,
-                'error'   => $e->getMessage(),
-                'trace'   => $e->getTraceAsString(),
-            ]);
-            return redirect()->back()->with('error', 'Import failed. Please check the file and try again.');
-        }
+        return redirect()->back()
+            ->with('success', 'Import started — your contacts will appear here within a few moments.')
+            ->with('import_id', $importId);
     }
-    
-    private function getColumnIndex(array $header, array $possibleNames)
+
+    /** Poll endpoint for the in-progress import banner. */
+    public function show(string $importId): \Illuminate\Http\JsonResponse
     {
-        foreach ($header as $index => $colName) {
-            if (in_array(strtolower(trim($colName)), $possibleNames)) {
-                return $index;
-            }
-        }
-        return false;
+        $this->authorize('viewAny', Contact::class);
+
+        return response()->json([
+            'data' => \Illuminate\Support\Facades\Cache::get(
+                ImportContactsJob::cacheKey($importId),
+                ['state' => 'pending'],
+            ),
+        ]);
     }
 }

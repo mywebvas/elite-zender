@@ -6,6 +6,7 @@ use App\Tenancy\HasUuid7;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use LogicException;
 
 /**
  * Append-only audit log record.
@@ -48,17 +49,23 @@ class AuditLog extends Model
     // Relations
     // -------------------------------------------------------------------------
 
+    /** @return BelongsTo<Tenant, $this> */
     public function tenant(): BelongsTo
     {
         return $this->belongsTo(Tenant::class);
     }
 
+    /** @return BelongsTo<User, $this> */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
     }
 
-    /** The model that was acted upon (Campaign, SmtpAccount, User, …). */
+    /**
+     * The model that was acted upon (Campaign, SmtpAccount, User, …).
+     *
+     * @return MorphTo<Model, $this>
+     */
     public function auditable(): MorphTo
     {
         return $this->morphTo();
@@ -69,18 +76,18 @@ class AuditLog extends Model
     // -------------------------------------------------------------------------
 
     /**
-     * @throws \LogicException
+     * @throws LogicException
      */
-    public function update(array $attributes = [], array $options = []): bool // @phpstan-ignore-line
+    public function update(array $attributes = [], array $options = []): bool
     {
-        throw new \LogicException('AuditLog records are immutable.');
+        throw new LogicException('AuditLog records are immutable.');
     }
 
     /**
-     * @throws \LogicException
+     * @throws LogicException
      */
-    public function delete(): ?bool // @phpstan-ignore-line
+    public function delete(): ?bool
     {
-        throw new \LogicException('AuditLog records cannot be deleted.');
+        throw new LogicException('AuditLog records cannot be deleted.');
     }
 }

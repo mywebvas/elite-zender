@@ -1,4 +1,4 @@
-﻿<div
+<div
     x-data="{
         toasts: [],
         add(msg, type='success', duration=4500) {
@@ -13,11 +13,21 @@
         },
         remove(id) { this.toasts = this.toasts.filter(t => t.id !== id); },
         init() {
-            window.$toast = (msg, type='success') => this.add(msg, type);
+            // app.js also defines window.$toast for the queue-backed variant;
+            // this component is the visual renderer, so it takes precedence
+            // while keeping the same signature.
+            window.$toast = (msg, type = 'success', duration = 4500) => this.add(msg, type, duration || 4500);
             @if(session('success')) this.add(@json(session('success')), 'success'); @endif
             @if(session('error'))   this.add(@json(session('error')),   'error');   @endif
             @if(session('warning')) this.add(@json(session('warning')), 'warning'); @endif
             @if(session('info'))    this.add(@json(session('info')),    'info');    @endif
+
+            {{-- Validation and action errors were flashed by controllers but
+                 never rendered anywhere, so a rejected action looked like it
+                 had simply done nothing. --}}
+            @foreach($errors->all() as $validationError)
+                this.add(@json($validationError), 'error');
+            @endforeach
         }
     }"
     class="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none max-w-sm w-full"

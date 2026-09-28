@@ -1,0 +1,24 @@
+Copyright (c) MyWebVas. All rights reserved.
+
+PROPRIETARY AND CONFIDENTIAL
+
+This software and its source code are the confidential and proprietary
+property of MyWebVas ("the Owner"). No part of this repository may be copied,
+reproduced, modified, published, distributed, sublicensed, sold, or used to
+create derivative works without the prior written permission of the Owner.
+
+Permission is granted to employees, contractors and other parties expressly
+authorised in writing by the Owner to use and modify this software solely for
+the purpose of developing and operating the EliteSender service on behalf of
+the Owner.
+
+Third-party components distributed with, or installed as dependencies of, this
+software remain subject to their own licences. See composer.lock and
+package-lock.json for the authoritative dependency inventory.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+OWNER BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.

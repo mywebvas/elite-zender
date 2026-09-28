@@ -1,0 +1,35 @@
+version: 2
+
+updates:
+  - package-ecosystem: composer
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: ['dependencies', 'php']
+    groups:
+      # Framework bumps land together or not at all — a partial Laravel
+      # upgrade is never installable.
+      laravel:
+        patterns: ['laravel/*', 'illuminate/*']
+      dev-tooling:
+        patterns: ['pestphp/*', 'phpunit/*', 'phpstan/*', 'mockery/*', 'nunomaduro/*']
+        dependency-type: development
+
+  - package-ecosystem: npm
+    directory: '/'
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels: ['dependencies', 'javascript']
+    groups:
+      build-tooling:
+        patterns: ['vite', '@vitejs/*', 'laravel-vite-plugin', 'tailwindcss', '@tailwindcss/*']
+
+  - package-ecosystem: github-actions
+    directory: '/'
+    schedule:
+      interval: monthly
+    labels: ['dependencies', 'ci']

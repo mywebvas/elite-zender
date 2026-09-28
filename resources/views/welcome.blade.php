@@ -8,12 +8,40 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Send 100,000 emails per hour with unlimited SMTP rotation. Own your email infrastructure permanently. No recurring SaaS fees.">
-    <title>EliteSender — Own Your Email Infrastructure</title>
-    <script>(function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark'); document.documentElement.style.backgroundColor = '#050508';}else{document.documentElement.classList.remove('dark'); document.documentElement.style.backgroundColor = '#ffffff';}})();</script>
+
+    <x-seo
+        title="EliteSender — Own Your Email Infrastructure"
+        description="Run email campaigns through your own pool of SMTP relays. Health-weighted rotation, deliverability tooling, automations and real-time analytics."
+        :schema="[
+            '@context' => 'https://schema.org',
+            '@type' => 'SoftwareApplication',
+            'name' => 'EliteSender',
+            'applicationCategory' => 'BusinessApplication',
+            'operatingSystem' => 'Web',
+            'description' => 'Multi-tenant email marketing platform with SMTP-pool rotation, deliverability tooling and real-time analytics.',
+            'url' => url('/'),
+            'offers' => [
+                ['@type' => 'Offer', 'name' => 'Free', 'price' => '0', 'priceCurrency' => 'USD'],
+                ['@type' => 'Offer', 'name' => 'Starter', 'price' => '15', 'priceCurrency' => 'USD'],
+                ['@type' => 'Offer', 'name' => 'Growth', 'price' => '59', 'priceCurrency' => 'USD'],
+                ['@type' => 'Offer', 'name' => 'Scale', 'price' => '159', 'priceCurrency' => 'USD'],
+            ],
+        ]"
+    />
+
+    {{-- Theme applied before first paint to avoid a flash of the wrong palette.
+         The nonce is required: the CSP allows inline scripts only when they
+         carry the per-request nonce, so without it this was silently blocked
+         and every visitor on dark mode saw a white flash. --}}
+    <script nonce="{{ $cspNonce ?? '' }}">(function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark'); document.documentElement.style.backgroundColor = '#050508';}else{document.documentElement.classList.remove('dark'); document.documentElement.style.backgroundColor = '#ffffff';}})();</script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="font-sans antialiased bg-white dark:bg-[#050508] text-slate-900 dark:text-white overflow-x-hidden">
+
+<a href="#main"
+   class="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-4 focus:left-4 focus:rounded-lg focus:bg-indigo-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">
+    Skip to main content
+</a>
 
 {{-- --------------------------- NAV --------------------------- --}}
 <nav class="fixed top-0 inset-x-0 z-50 glass border-b border-white/10 dark:border-white/[0.05]">
@@ -35,7 +63,7 @@
                 <svg x-show="darkMode"  class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v2.25m6.364.386l-1.591 1.591M21 12h-2.25m-.386 6.364l-1.591-1.591M12 18.75V21m-4.773-4.227l-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z"/></svg>
             </button>
             @auth
-            <a href="{{ url('/dashboard') }}" class="text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400">Dashboard ?</a>
+            <a href="{{ url('/dashboard') }}" class="text-sm font-semibold text-slate-700 dark:text-slate-200 hover:text-indigo-600 dark:hover:text-indigo-400">Dashboard &rarr;</a>
             @else
             <a href="{{ route('login') }}" class="text-sm font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white transition-colors">Log in</a>
             <a href="{{ route('register') }}" class="btn-gradient text-sm py-2 px-4">Get started free</a>
@@ -43,6 +71,8 @@
         </div>
     </div>
 </nav>
+
+<main id="main">
 
 {{-- --------------------------- HERO --------------------------- --}}
 <section class="relative min-h-screen flex items-center justify-center pt-[calc(64px+90px)] pb-24 overflow-hidden"
@@ -349,6 +379,8 @@
 </section>
 
 {{-- Footer --}}
+</main>
+
 <footer class="py-12 border-t border-slate-200 dark:border-white/[0.05] bg-white dark:bg-[#050508]">
     <div class="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
         <div class="flex items-center gap-2">
@@ -366,6 +398,7 @@
 </footer>
 
 <x-toast />
+
 </body>
 </html>
 

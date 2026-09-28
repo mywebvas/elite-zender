@@ -1,4 +1,4 @@
-﻿@props([
+@props([
     'variant' => 'slate',
     'color'   => null,
     'size'    => 'sm',

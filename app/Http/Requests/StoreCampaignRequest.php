@@ -2,34 +2,50 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Campaign;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreCampaignRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('create', Campaign::class) ?? false;
     }
 
+    /**
+     * @return array<string, array<int, mixed>>
+     */
     public function rules(): array
     {
-        $tenantId = \App\Tenancy\TenantContext::id();
+        return array_merge(
+            CampaignRules::content(),
+            CampaignRules::tenantScopedRelations(),
+        );
+    }
 
+    /**
+     * Normalise the multi-select before validation so `sync()` always receives
+     * a clean list, even when the form posts an empty string.
+     */
+    protected function prepareForValidation(): void
+    {
+        if ($this->has('smtp_account_ids') && ! is_array($this->input('smtp_account_ids'))) {
+            $this->merge(['smtp_account_ids' => array_filter((array) $this->input('smtp_account_ids'))]);
+        }
+    }
+
+    /** @return array<string, string> */
+    public function messages(): array
+    {
         return [
-            'name'               => ['required', 'string', 'max:255'],
-            'subject'            => ['required', 'string', 'max:1000'],
-            'body_html'          => ['nullable', 'string'],
-            'body_text'          => ['nullable', 'string'],
-            'list_id'            => [
-                'nullable', 
-                'string', 
-                \Illuminate\Validation\Rule::exists('contact_lists', 'id')->where('tenant_id', $tenantId)
-            ],
-            'smtp_account_ids'   => ['nullable', 'array'],
-            'smtp_account_ids.*' => [
-                'string', 
-                \Illuminate\Validation\Rule::exists('smtp_accounts', 'id')->where('tenant_id', $tenantId)
-            ],
+            'list_id.exists' => 'The selected contact list does not belong to your workspace.',
+            'smtp_account_ids.*.exists' => 'One of the selected SMTP accounts does not belong to your workspace.',
         ];
+    }
+
+    /** @return array<string, string> */
+    public function attributes(): array
+    {
+        return ['list_id' => 'contact list'];
     }
 }

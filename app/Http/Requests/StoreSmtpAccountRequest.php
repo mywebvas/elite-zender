@@ -2,36 +2,39 @@
 
 namespace App\Http\Requests;
 
-use Illuminate\Contracts\Validation\ValidationRule;
+use App\Models\SmtpAccount;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreSmtpAccountRequest extends FormRequest
 {
-    /**
-     * Determine if the user is authorized to make this request.
-     */
     public function authorize(): bool
     {
-        return true;
+        return $this->user()?->can('create', SmtpAccount::class) ?? false;
     }
 
     /**
-     * Get the validation rules that apply to the request.
-     *
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, array<int, mixed>>
      */
     public function rules(): array
     {
         return [
-            'name'       => ['required', 'string', 'max:255'],
-            'host'       => ['required', 'string', 'max:255'],
-            'port'       => ['required', 'integer', 'min:1', 'max:65535'],
-            'username'   => ['nullable', 'string', 'max:255'],
-            'password'   => ['nullable', 'string', 'max:255'],
-            'from_email' => ['required', 'email', 'max:255'],
-            'from_name'  => ['required', 'string', 'max:255'],
-            'encryption' => ['nullable', 'in:tls,ssl'],
-            'daily_limit' => ['nullable', 'integer', 'min:1'],
+            'name' => ['required', 'string', 'max:255'],
+            'host' => ['required', 'string', 'max:255'],
+            'port' => ['required', 'integer', 'min:1', 'max:65535'],
+            'username' => ['nullable', 'string', 'max:255'],
+            // Long passphrases and provider API keys routinely exceed 255
+            // characters; the column is TEXT, so do not truncate the policy to
+            // the old varchar limit.
+            'password' => ['nullable', 'string', 'max:1024'],
+            'from_email' => ['required', 'email:rfc', 'max:255'],
+            'from_name' => ['required', 'string', 'max:255'],
+            'encryption' => ['nullable', Rule::in(['tls', 'ssl', 'none'])],
+            'daily_limit' => ['nullable', 'integer', 'min:1', 'max:1000000'],
+            'status' => ['nullable', Rule::in([
+                SmtpAccount::STATUS_ACTIVE,
+                SmtpAccount::STATUS_PAUSED,
+            ])],
         ];
     }
 }

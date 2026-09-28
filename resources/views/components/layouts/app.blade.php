@@ -19,11 +19,15 @@
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
 
-    {{-- Preconnect for fonts --}}
-    <link rel="preconnect" href="https://fonts.bunny.net">
+    {{-- Fonts are self-hosted by the Vite font plugin at build time; there is
+         no third-party font request to preconnect to at run time. --}}
 
+    {{-- Turbo is bundled inside app.js. It used to be loaded from a CDN,
+         which the Content-Security-Policy (script-src 'self' + nonce) blocked
+         outright — so navigation never actually accelerated. --}}
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <script type="module" src="https://cdn.jsdelivr.net/npm/@hotwired/turbo@8.0.4/dist/turbo.es2017-esm.js"></script>
+
+    @stack('styles')
 
     {{-- Inline theme-flash prevention (must run before body renders) --}}
     <script nonce="{{ $cspNonce ?? '' }}">
@@ -42,6 +46,12 @@
 </head>
 
 <body class="h-full bg-slate-50 dark:bg-slate-950 font-sans antialiased">
+
+    {{-- Keyboard users must be able to jump past the sidebar and top bar. --}}
+    <a href="#main-content"
+       class="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-3 focus:left-3 focus:rounded-lg focus:bg-indigo-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">
+        Skip to main content
+    </a>
 
     {{-- ================================================================
          DESKTOP SIDEBAR + MAIN LAYOUT

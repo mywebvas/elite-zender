@@ -1,4 +1,4 @@
-﻿*.log
+*.log
 .DS_Store
 .env
 .env.backup
@@ -44,3 +44,9 @@ fix_encoding.php
 fix.php
 fix_utf8.php
 
+
+# PHPStan / build artefacts
+/build
+
+# Stray test output
+test_out.txt

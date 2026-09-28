@@ -1,0 +1,32 @@
+{
+    "preset": "laravel",
+    "rules": {
+        "declare_strict_types": false,
+        "final_class": false,
+        "fully_qualified_strict_types": true,
+        "global_namespace_import": {
+            "import_classes": true,
+            "import_constants": false,
+            "import_functions": false
+        },
+        "no_unused_imports": true,
+        "ordered_imports": {
+            "sort_algorithm": "alpha"
+        },
+        "ordered_traits": true,
+        "php_unit_method_casing": {
+            "case": "snake_case"
+        },
+        "single_quote": true,
+        "trailing_comma_in_multiline": {
+            "elements": ["arrays", "arguments", "parameters", "match"]
+        },
+        "void_return": true
+    },
+    "exclude": [
+        "bootstrap/cache",
+        "specimen1",
+        "storage",
+        "vendor"
+    ]
+}

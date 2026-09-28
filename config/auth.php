@@ -53,6 +53,16 @@ return [
             'driver' => 'sanctum',
             'provider' => 'users',
         ],
+
+        /*
+         * Platform operators. A separate guard means a separate session, so an
+         * admin session can never be mistaken for a customer session (or vice
+         * versa) by a policy that only checks `auth()->user()`.
+         */
+        'admin' => [
+            'driver' => 'session',
+            'provider' => 'admins',
+        ],
     ],
 
     /*
@@ -78,10 +88,10 @@ return [
             'model' => env('AUTH_MODEL', User::class),
         ],
 
-        // 'users' => [
-        //     'driver' => 'database',
-        //     'table' => 'users',
-        // ],
+        'admins' => [
+            'driver' => 'eloquent',
+            'model' => App\Models\Admin::class,
+        ],
     ],
 
     /*

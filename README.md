@@ -36,7 +36,10 @@ same audience so the next send is cleaner than the last.
 | Smart retargeting (exclude previous openers) | ✅ |
 | REST API v1 (Sanctum) with resource transformers | ✅ |
 | Automations: visual builder + step graph | ⚠️ builder ships; the runtime executor is the next milestone |
-| Billing / plans | ⚠️ plan tiers drive rate limits; no payment integration yet |
+| Billing: plans, invoices, usage limits, refunds | ✅ |
+| Payments: Paystack (NGN + USD), offline bank transfer | ✅ |
+| Payments: Stripe | ⚠️ driver implemented; hidden until `STRIPE_SECRET_KEY` is set |
+| Operator console: separate guard, impersonation, plan control | ✅ |
 
 ---
 
@@ -74,6 +77,8 @@ Key building blocks:
 | `app/Services/BounceClassifier.php` | RFC 3463 DSN classification |
 | `app/Support/UnsubscribeLink.php` | Signed, non-expiring opt-out URLs |
 | `app/Jobs/` | Campaign fan-out, chunked sending, bounce ingestion, imports |
+| `app/Billing/` | Gateways, invoicing state machine, plan limits |
+| `app/Http/Controllers/Admin/` | Operator console (separate `admin` guard) |
 | `docs/` | Decision log and module specs — **read `docs/README.md` first** |
 
 ---
@@ -113,6 +118,18 @@ make setup   # install, migrate, build
 make dev     # dev server + Vite watcher
 make check   # style + static analysis + tests (what CI runs)
 ```
+
+### Creating the first operator
+
+There is no self-service admin signup and no seeded default credentials — a
+well-known default admin account is how a platform gets owned on day one.
+
+```bash
+php artisan elitesender:make-admin
+```
+
+Then sign in at `/admin`. Operators live in their own table behind their own
+guard, so a customer session can never reach the console (and vice versa).
 
 ### Background processing
 

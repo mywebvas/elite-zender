@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Billing\PlanGate;
 use App\Http\Requests\StoreContactRequest;
 use App\Models\Contact;
 use App\Models\ContactList;
@@ -53,9 +54,13 @@ class ContactController extends Controller
         ]);
     }
 
-    public function store(StoreContactRequest $request): RedirectResponse
+    public function store(StoreContactRequest $request, PlanGate $planGate): RedirectResponse
     {
         $this->authorize('create', Contact::class);
+
+        if ($reason = $planGate->denialReason(\App\Tenancy\TenantContext::tenant(), 'contacts')) {
+            return back()->withInput()->withErrors($reason);
+        }
 
         $validated = $request->validated();
 

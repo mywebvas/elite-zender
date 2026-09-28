@@ -1,10 +1,12 @@
 <?php
 
+use App\Http\Middleware\EnsureAdmin;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\NoStoreForAuthenticated;
 use App\Http\Middleware\PublicApiCors;
 use App\Http\Middleware\ResolveTenant;
 use App\Http\Middleware\SecurityHeaders;
+use App\Http\Middleware\ShareImpersonationBanner;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -21,6 +23,12 @@ foreach (['SIGINT' => 2, 'SIGTERM' => 15, 'SIGHUP' => 1] as $signal => $value) {
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
         web: __DIR__.'/../routes/web.php',
+        then: function (): void {
+            // The operator console is a separate surface on the web stack:
+            // same session middleware, different guard.
+            Illuminate\Support\Facades\Route::middleware('web')
+                ->group(__DIR__.'/../routes/admin.php');
+        },
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
@@ -35,11 +43,16 @@ return Application::configure(basePath: dirname(__DIR__))
         // Tenant context must be bound for BOTH stacks. It used to be web-only,
         // which meant every `auth:sanctum` API request ran with no tenant
         // bound — and therefore with the HasTenant global scope inert.
-        $middleware->web(append: [ResolveTenant::class, NoStoreForAuthenticated::class]);
+        $middleware->web(append: [
+            ResolveTenant::class,
+            ShareImpersonationBanner::class,
+            NoStoreForAuthenticated::class,
+        ]);
         $middleware->api(append: [ResolveTenant::class, NoStoreForAuthenticated::class]);
 
         $middleware->alias([
             'public-cors' => PublicApiCors::class,
+            'admin' => EnsureAdmin::class,
         ]);
 
         // RFC 8058 one-click unsubscribe is a cross-origin POST issued by the
@@ -47,6 +60,9 @@ return Application::configure(basePath: dirname(__DIR__))
         // which is the integrity guarantee CSRF would otherwise provide.
         $middleware->validateCsrfTokens(except: [
             'unsubscribe/*',
+            // Payment providers cannot hold a CSRF token; each webhook is
+            // authenticated by its own HMAC signature instead.
+            'webhooks/billing/*',
         ]);
 
         /*

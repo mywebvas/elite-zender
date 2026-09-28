@@ -18,7 +18,19 @@ class ResolveTenant
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        // The operator console is cross-tenant by design and must never be
+        // scoped to (or blocked by) whatever customer session happens to be
+        // open in the same browser.
+        if ($request->is('admin', 'admin/*')) {
+            return $next($request);
+        }
+
+        // Explicitly the `web` guard, never the ambient default. Admin routes
+        // share this middleware stack, and an operator authenticated on the
+        // `admin` guard has no tenant_id — asking the default guard for "the
+        // user" would hand this an Admin and blow up mid-request.
+        /** @var \App\Models\User|null $user */
+        $user = auth('web')->user();
         $tenant = null;
 
         if ($user !== null && $user->tenant_id !== null) {
@@ -35,7 +47,11 @@ class ResolveTenant
                 abort(403, 'Your workspace is unavailable.');
             }
 
-            if ($tenant->status !== Tenant::STATUS_ACTIVE) {
+            // A suspended workspace is closed to its own users, but an
+            // operator must still be able to get in and out of it — otherwise
+            // suspending a workspace while impersonating strands them there
+            // with no route back to the console.
+            if ($tenant->status !== Tenant::STATUS_ACTIVE && ! auth('admin')->check()) {
                 abort(403, 'This workspace has been suspended.');
             }
         }

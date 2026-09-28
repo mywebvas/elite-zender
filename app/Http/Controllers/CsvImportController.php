@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Billing\PlanGate;
 use App\Jobs\ImportContactsJob;
 use App\Models\Contact;
 use App\Tenancy\TenantContext;
@@ -19,9 +20,15 @@ class CsvImportController extends Controller
      * large file could hold an HTTP worker (and a DB write lock) hostage for
      * minutes and eventually time out with a half-applied import.
      */
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request, PlanGate $planGate): RedirectResponse
     {
         $this->authorize('create', Contact::class);
+
+        // Checked before the file is even stored: discovering the limit after
+        // importing 400k rows helps nobody.
+        if ($reason = $planGate->denialReason(TenantContext::tenant(), 'contacts')) {
+            return back()->withErrors($reason);
+        }
 
         $validated = $request->validate([
             'csv_file' => ['required', 'file', 'mimes:csv,txt', 'max:20480'], // 20 MB

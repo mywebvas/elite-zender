@@ -20,7 +20,9 @@ class NoStoreForAuthenticated
     {
         $response = $next($request);
 
-        if (! $request->user()) {
+        // Operator pages are at least as sensitive as customer pages, so both
+        // guards count here.
+        if (! auth('web')->check() && ! auth('admin')->check()) {
             return $response;
         }
 

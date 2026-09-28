@@ -1,6 +1,9 @@
 <?php
 
 use App\Http\Controllers\AutomationController;
+use App\Http\Controllers\Billing\BillingController;
+use App\Http\Controllers\Billing\CheckoutController;
+use App\Http\Controllers\Billing\WebhookController;
 use App\Http\Controllers\BounceController;
 use App\Http\Controllers\CampaignController;
 use App\Http\Controllers\ContactController;
@@ -54,7 +57,7 @@ Route::match(['get', 'post'], '/unsubscribe/{campaign}/{contact}', UnsubscribeCo
 |--------------------------------------------------------------------------
 */
 
-Route::middleware(['auth'])->group(function (): void {
+Route::middleware(['auth:web'])->group(function (): void {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
     Route::get('/onboarding', OnboardingController::class)->name('onboarding');
@@ -87,9 +90,33 @@ Route::middleware(['auth'])->group(function (): void {
 
     Route::get('/bounces', BounceController::class)->name('bounces.index');
 
+    /*
+     | Billing. Viewing is open to the whole workspace; committing to spend is
+     | gated to owners and admins inside the controllers.
+     */
+    Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
+    Route::post('/billing/subscribe', [BillingController::class, 'subscribe'])->name('billing.subscribe');
+    Route::post('/billing/cancel', [BillingController::class, 'cancel'])->name('billing.cancel');
+    Route::get('/billing/invoices/{invoice}', [BillingController::class, 'showInvoice'])->name('billing.invoices.show');
+    Route::post('/billing/invoices/{invoice}/checkout', [CheckoutController::class, 'start'])->name('billing.checkout.start');
+    Route::get('/billing/invoices/{invoice}/callback', [CheckoutController::class, 'callback'])->name('billing.checkout.callback');
+    Route::post('/billing/invoices/{invoice}/proof', [CheckoutController::class, 'uploadProof'])->name('billing.proof');
+
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.index');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
 });
+
+/*
+|--------------------------------------------------------------------------
+| Payment webhooks
+|--------------------------------------------------------------------------
+| Unauthenticated by necessity and CSRF-exempt, so the provider's signature is
+| the entire security boundary (see Billing\WebhookController).
+*/
+
+Route::post('/webhooks/billing/{gateway}', WebhookController::class)
+    ->middleware('throttle:120,1')
+    ->name('billing.webhook');
 
 /*
 |--------------------------------------------------------------------------

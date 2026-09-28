@@ -47,6 +47,24 @@
 
 <body class="h-full bg-slate-50 dark:bg-slate-950 font-sans antialiased">
 
+    @isset($impersonating)
+        @if($impersonating)
+            <div class="sticky top-0 z-[60] flex flex-wrap items-center justify-center gap-3 bg-amber-500 px-4 py-2 text-center text-sm font-semibold text-slate-950" role="alert">
+                <span>
+                    Operator view — you are signed in as a customer
+                    @if($impersonating['tenant']) in <strong>{{ $impersonating['tenant'] }}</strong>@endif.
+                    Everything you do here is real and is being logged.
+                </span>
+                <form method="POST" action="{{ route('impersonate.stop') }}">
+                    @csrf
+                    <button type="submit" class="rounded-md bg-slate-950 px-3 py-1 text-xs font-bold text-amber-400 hover:bg-slate-800">
+                        Return to console
+                    </button>
+                </form>
+            </div>
+        @endif
+    @endisset
+
     {{-- Keyboard users must be able to jump past the sidebar and top bar. --}}
     <a href="#main-content"
        class="sr-only focus:not-sr-only focus:absolute focus:z-[100] focus:top-3 focus:left-3 focus:rounded-lg focus:bg-indigo-600 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-white">
@@ -88,6 +106,7 @@
                         ['route' => 'lists.index',               'label' => 'Lists',      'icon' => 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2'],
                         ['route' => 'smtp-accounts.index', 'label' => 'SMTP Pool',  'icon' => 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2'],
                         ['route' => 'bounces.index',               'label' => 'Bounces',    'icon' => 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6'],
+                        ['route' => 'billing.index',   'label' => 'Billing',    'icon' => 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z'],
                         ['route' => 'settings.index',               'label' => 'Settings',   'icon' => 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'],
                     ];
                 @endphp

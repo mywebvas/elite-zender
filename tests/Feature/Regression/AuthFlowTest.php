@@ -81,8 +81,10 @@ it('arms CSRF protection on state-changing routes', function (string $uri): void
 it('exempts only the RFC 8058 unsubscribe endpoint from CSRF', function (): void {
     // One-click unsubscribe is a cross-origin POST from a mail client with no
     // session; the signed URL provides the integrity guarantee instead.
+    // Both are cross-origin POSTs that cannot carry a token: the unsubscribe
+    // route is signed, and webhooks are HMAC-verified by the provider.
     expect(app(Illuminate\Foundation\Http\Middleware\VerifyCsrfToken::class)->getExcludedPaths())
-        ->toBe(['unsubscribe/*']);
+        ->toBe(['unsubscribe/*', 'webhooks/billing/*']);
 });
 
 it('logs the user out and forgets the session', function (): void {

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Billing\PlanGate;
 use App\Http\Requests\StoreSmtpAccountRequest;
 use App\Models\SmtpAccount;
 use Illuminate\Contracts\View\View;
@@ -18,9 +19,13 @@ class SmtpAccountController extends Controller
         return view('smtp.index', compact('accounts'));
     }
 
-    public function store(StoreSmtpAccountRequest $request): RedirectResponse
+    public function store(StoreSmtpAccountRequest $request, PlanGate $planGate): RedirectResponse
     {
         $this->authorize('create', SmtpAccount::class);
+
+        if ($reason = $planGate->denialReason(\App\Tenancy\TenantContext::tenant(), 'smtp_accounts')) {
+            return back()->withInput()->withErrors($reason);
+        }
 
         $data = $request->validated();
 

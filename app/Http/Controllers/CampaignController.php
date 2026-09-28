@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Billing\PlanGate;
 use App\Http\Requests\StoreCampaignRequest;
 use App\Http\Requests\UpdateCampaignRequest;
 use App\Jobs\DispatchCampaignJob;
@@ -155,11 +156,19 @@ class CampaignController extends Controller
     }
 
     /** Queue a draft campaign for sending. */
-    public function dispatch(string $id): RedirectResponse
+    public function dispatch(string $id, PlanGate $planGate): RedirectResponse
     {
         $campaign = Campaign::findOrFail($id);
 
         $this->authorize('update', $campaign);
+
+        $tenant = \App\Tenancy\TenantContext::tenant();
+
+        if ($tenant !== null && ! $planGate->canSend($tenant)) {
+            return back()->withErrors(
+                'Sending is paused: your plan\'s monthly limit is used up, or your subscription needs attention.',
+            );
+        }
 
         if ($campaign->status !== Campaign::STATUS_DRAFT) {
             return redirect()->back()->withErrors('Only draft campaigns can be sent.');

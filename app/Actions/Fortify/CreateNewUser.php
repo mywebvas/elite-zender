@@ -41,13 +41,20 @@ class CreateNewUser implements CreatesNewUsers
                 'slug' => \Illuminate\Support\Str::slug($workspaceName).'-'.uniqid(),
             ]);
 
-            return User::create([
+            $user = User::create([
                 'tenant_id' => $tenant->id,
                 'name' => $input['name'],
                 'email' => $input['email'],
                 'password' => Hash::make($input['password']),
-                'role' => 'owner',
+                'role' => \App\Models\Role::OWNER,
             ]);
+
+            // Inside the same transaction: a workspace without a subscription
+            // row would fall back to free-tier limits with no way to upgrade
+            // from the billing page.
+            app(\App\Billing\BillingService::class)->startTrial($tenant);
+
+            return $user;
         });
     }
 }

@@ -1,0 +1,176 @@
+<?php
+
+namespace App\Billing\Gateways;
+
+use App\Billing\CheckoutSession;
+use App\Billing\Contracts\PaymentGateway;
+use App\Billing\PaymentResult;
+use App\Models\Invoice;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
+use RuntimeException;
+
+/**
+ * Stripe Checkout, over the REST API.
+ *
+ * Shipped behind a configuration flag: with no STRIPE_SECRET_KEY set,
+ * `isConfigured()` returns false and the gateway never appears at checkout, so
+ * the code below cannot run against an unverified account. Set the three env
+ * vars and it becomes selectable — no deploy or code change required.
+ *
+ * Verified against the documented v1 endpoints. The one thing that genuinely
+ * needs a live account to confirm is webhook delivery, so treat the first
+ * production event as a smoke test.
+ */
+final class StripeGateway implements PaymentGateway
+{
+    /** Stripe tolerates at most this much clock skew on a webhook. */
+    private const WEBHOOK_TOLERANCE_SECONDS = 300;
+
+    public function key(): string
+    {
+        return 'stripe';
+    }
+
+    public function label(): string
+    {
+        return 'Card (Stripe)';
+    }
+
+    public function isConfigured(): bool
+    {
+        return filled($this->config('secret_key'));
+    }
+
+    public function supports(string $currency): bool
+    {
+        return in_array(strtoupper($currency), $this->config('currencies', []), true);
+    }
+
+    public function checkout(Invoice $invoice, string $callbackUrl): CheckoutSession
+    {
+        $reference = 'ez_'.Str::lower(Str::random(24));
+
+        // Stripe's form encoding is bracketed rather than JSON.
+        $response = Http::withToken((string) $this->config('secret_key'))
+            ->baseUrl((string) $this->config('base_url'))
+            ->asForm()
+            ->timeout(20)
+            ->post('/v1/checkout/sessions', [
+                'mode' => 'payment',
+                'success_url' => $callbackUrl.'?reference='.$reference,
+                'cancel_url' => $callbackUrl.'?reference='.$reference.'&cancelled=1',
+                'client_reference_id' => $reference,
+                'line_items[0][quantity]' => 1,
+                'line_items[0][price_data][currency]' => strtolower($invoice->currency),
+                'line_items[0][price_data][unit_amount]' => $invoice->balance(),
+                'line_items[0][price_data][product_data][name]' => 'Invoice '.$invoice->number,
+                'metadata[invoice_id]' => $invoice->getKey(),
+                'metadata[tenant_id]' => $invoice->tenant_id,
+            ]);
+
+        if (! $response->successful()) {
+            throw new RuntimeException(
+                'Stripe could not start this payment: '.($response->json('error.message') ?? 'unknown error'),
+            );
+        }
+
+        return new CheckoutSession(
+            gateway: $this->key(),
+            reference: $reference,
+            redirectUrl: (string) $response->json('url'),
+        );
+    }
+
+    public function verify(string $reference): PaymentResult
+    {
+        $response = Http::withToken((string) $this->config('secret_key'))
+            ->baseUrl((string) $this->config('base_url'))
+            ->timeout(20)
+            ->get('/v1/checkout/sessions', ['limit' => 1, 'client_reference_id' => $reference]);
+
+        $session = $response->json('data.0');
+
+        if (! is_array($session)) {
+            return PaymentResult::failure($this->key(), 'No Stripe session found for this reference.', $reference);
+        }
+
+        if (($session['payment_status'] ?? null) !== 'paid') {
+            return PaymentResult::failure($this->key(), 'Payment was not completed.', $reference, $session);
+        }
+
+        return PaymentResult::success(
+            gateway: $this->key(),
+            gatewayRef: (string) ($session['payment_intent'] ?? $session['id']),
+            reference: $reference,
+            amount: (int) ($session['amount_total'] ?? 0),
+            currency: strtoupper((string) ($session['currency'] ?? 'usd')),
+            raw: $session,
+        );
+    }
+
+    /**
+     * Stripe signs `{timestamp}.{body}` with HMAC-SHA256 and sends it in the
+     * Stripe-Signature header. The timestamp check is what stops an attacker
+     * replaying a genuine, correctly signed event months later.
+     */
+    public function verifyWebhook(Request $request): bool
+    {
+        $header = (string) $request->header('Stripe-Signature');
+        $secret = (string) $this->config('webhook_secret');
+
+        if ($header === '' || $secret === '') {
+            return false;
+        }
+
+        $parts = [];
+        foreach (explode(',', $header) as $segment) {
+            [$key, $value] = array_pad(explode('=', trim($segment), 2), 2, null);
+            $parts[$key][] = $value;
+        }
+
+        $timestamp = (int) ($parts['t'][0] ?? 0);
+
+        if ($timestamp <= 0 || abs(time() - $timestamp) > self::WEBHOOK_TOLERANCE_SECONDS) {
+            return false;
+        }
+
+        $expected = hash_hmac('sha256', $timestamp.'.'.$request->getContent(), $secret);
+
+        foreach ($parts['v1'] ?? [] as $candidate) {
+            if (is_string($candidate) && hash_equals($expected, $candidate)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public function parseWebhook(Request $request): ?PaymentResult
+    {
+        if ((string) $request->input('type') !== 'checkout.session.completed') {
+            return null;
+        }
+
+        $session = (array) $request->input('data.object', []);
+
+        if (($session['payment_status'] ?? null) !== 'paid') {
+            return null;
+        }
+
+        return PaymentResult::success(
+            gateway: $this->key(),
+            gatewayRef: (string) ($session['payment_intent'] ?? $session['id'] ?? ''),
+            reference: (string) ($session['client_reference_id'] ?? ''),
+            amount: (int) ($session['amount_total'] ?? 0),
+            currency: strtoupper((string) ($session['currency'] ?? 'usd')),
+            raw: $session,
+        );
+    }
+
+    private function config(string $key, mixed $default = null): mixed
+    {
+        return config("billing.gateways.stripe.{$key}", $default);
+    }
+}

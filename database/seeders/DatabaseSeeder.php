@@ -27,6 +27,8 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
+        $this->call(PlanSeeder::class);
+
         $acme = $this->workspace('Acme Corp', 'demo@elitesender.app', withData: true);
         $rival = $this->workspace('Globex', 'rival@elitesender.app', withData: true);
 
@@ -121,6 +123,8 @@ class DatabaseSeeder extends Seeder
                 'list_id' => $list->id,
                 'name' => 'Website footer form',
             ]);
+
+            app(\App\Billing\BillingService::class)->startTrial($tenant);
 
             return $tenant;
         });

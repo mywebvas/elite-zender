@@ -125,6 +125,10 @@ class SendCampaignChunkJob implements ShouldQueue
         Campaign::withoutGlobalScopes()
             ->whereKey($this->campaign->getKey())
             ->incrementEach(['sent_count' => $sent, 'failed_count' => $failed]);
+
+        // Billable usage counts messages actually handed to a relay, never the
+        // size of the list.
+        app(\App\Billing\PlanGate::class)->recordEmailsSent((string) $this->campaign->tenant_id, $sent);
     }
 
     private function deliver(

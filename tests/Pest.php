@@ -52,6 +52,16 @@ expect()->extend('toHaveSecurityHeader', function (string $header, ?string $cont
 */
 
 /**
+ * Seed the plan catalogue. Tests that exercise billing or plan limits need it;
+ * the rest deliberately run without it, which also proves the application
+ * degrades sensibly on an unseeded install.
+ */
+function seedPlans(): void
+{
+    (new Database\Seeders\PlanSeeder)->run();
+}
+
+/**
  * Create a signed-in user bound to a fresh tenant, and bind the tenant context
  * so model global scopes behave exactly as they do behind the middleware.
  */

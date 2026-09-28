@@ -71,8 +71,10 @@ class DatabaseSeeder extends Seeder
                 'name' => 'Newsletter subscribers',
             ]);
 
-            $tags = collect(['vip', 'trial', 'churn-risk'])
-                ->map(fn (string $tag) => Tag::create(['tenant_id' => $tenant->id, 'name' => $tag]));
+            /** @var \Illuminate\Support\Collection<int, Tag> $tags */
+            $tags = collect(['vip', 'trial', 'churn-risk'])->map(
+                fn (string $tag): Tag => Tag::query()->create(['tenant_id' => $tenant->id, 'name' => $tag]),
+            );
 
             $contacts = Contact::factory(50)->create(['tenant_id' => $tenant->id]);
             $contacts->each(function (Contact $contact) use ($list, $tags): void {
@@ -96,7 +98,7 @@ class DatabaseSeeder extends Seeder
                 // Roughly a 40% open rate and 12% click rate, so the dashboard
                 // shows plausible numbers rather than zeroes.
                 foreach ($contacts->random(20) as $contact) {
-                    CampaignEvent::create([
+                    CampaignEvent::query()->create([
                         'tenant_id' => $tenant->id,
                         'campaign_id' => $campaign->id,
                         'contact_id' => $contact->id,
@@ -105,7 +107,7 @@ class DatabaseSeeder extends Seeder
                 }
 
                 foreach ($contacts->random(6) as $contact) {
-                    CampaignEvent::create([
+                    CampaignEvent::query()->create([
                         'tenant_id' => $tenant->id,
                         'campaign_id' => $campaign->id,
                         'contact_id' => $contact->id,

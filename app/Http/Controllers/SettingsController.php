@@ -13,9 +13,22 @@ class SettingsController extends Controller
 {
     public function edit(): View
     {
+        $tenant = TenantContext::tenant();
+
         return view('settings.index', [
-            'tenant' => TenantContext::tenant(),
+            'tenant' => $tenant,
             'timezones' => DateTimeZone::listIdentifiers(),
+            'exports' => $tenant === null ? collect() : \App\Models\DataRequest::withoutGlobalScopes()
+                ->where('tenant_id', $tenant->getKey())
+                ->where('type', \App\Models\DataRequest::TYPE_EXPORT)
+                ->latest()
+                ->limit(3)
+                ->get(),
+            'pendingDeletion' => $tenant === null ? null : \App\Models\DataRequest::withoutGlobalScopes()
+                ->where('tenant_id', $tenant->getKey())
+                ->where('type', \App\Models\DataRequest::TYPE_DELETION)
+                ->where('status', \App\Models\DataRequest::STATUS_PENDING)
+                ->first(),
         ]);
     }
 

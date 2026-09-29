@@ -298,6 +298,140 @@
                             </div>
                         </form>
                     </x-card>
+
+                    {{-- Your data: export and erasure (GDPR Art. 15 / 17) --}}
+                    <x-card id="data">
+                        <div class="border-b border-slate-200 p-6 dark:border-white/10">
+                            <h3 class="text-lg font-medium text-slate-900 dark:text-white">Your data</h3>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                Take a copy whenever you like, and leave whenever you like. Both are
+                                buttons, not a support ticket.
+                            </p>
+                        </div>
+
+                        <div class="space-y-6 p-6">
+                            {{-- Export --}}
+                            <div>
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Export everything</p>
+                                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                            Contacts, lists, campaigns, engagement history, team and relay
+                                            configuration, as CSV in a zip. Credentials are deliberately excluded.
+                                        </p>
+                                    </div>
+                                    <form method="POST" action="{{ route('data.export') }}" class="flex-shrink-0">
+                                        @csrf
+                                        <x-button type="submit" variant="secondary">Request export</x-button>
+                                    </form>
+                                </div>
+
+                                @if($exports->isNotEmpty())
+                                    <ul class="mt-4 space-y-2">
+                                        @foreach($exports as $export)
+                                            <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm dark:border-white/10">
+                                                <span class="text-slate-600 dark:text-slate-300">
+                                                    {{ $export->created_at?->toFormattedDayDateString() }}
+                                                    @if($export->status === App\Models\DataRequest::STATUS_PENDING)
+                                                        · <span class="font-medium text-amber-600 dark:text-amber-400">preparing…</span>
+                                                    @elseif($export->isDownloadable())
+                                                        · {{ number_format(($export->file_size ?? 0) / 1024) }} KB
+                                                        · expires {{ $export->expires_at?->diffForHumans() }}
+                                                    @elseif($export->status === App\Models\DataRequest::STATUS_FAILED)
+                                                        · <span class="font-medium text-rose-600 dark:text-rose-400">failed</span>
+                                                    @else
+                                                        · <span class="text-slate-400">no longer available</span>
+                                                    @endif
+                                                </span>
+                                                @if($export->isDownloadable())
+                                                    <a href="{{ route('data.download', $export) }}"
+                                                       class="font-semibold text-brand-600 underline-offset-2 hover:underline dark:text-brand-400">Download</a>
+                                                @endif
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+
+                            {{-- Erasure --}}
+                            <div class="border-t border-slate-100 pt-6 dark:border-white/[0.06]">
+                                @if($pendingDeletion)
+                                    <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-500/20 dark:bg-rose-500/10">
+                                        <p class="text-sm font-semibold text-rose-900 dark:text-rose-200">
+                                            This workspace is scheduled for deletion on
+                                            {{ $pendingDeletion->scheduled_for?->toFormattedDayDateString() }}.
+                                        </p>
+                                        <p class="mt-1 text-sm text-rose-800 dark:text-rose-300">
+                                            Everything is still here and still working until then. After that it is gone permanently.
+                                        </p>
+                                        <form method="POST" action="{{ route('data.delete.cancel', $pendingDeletion) }}" class="mt-3">
+                                            @csrf @method('DELETE')
+                                            <x-button type="submit" variant="primary">Cancel the deletion</x-button>
+                                        </form>
+                                    </div>
+                                @elseif(auth()->user()->isOwner())
+                                    <div x-data="{ open: false }">
+                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="text-sm font-semibold text-slate-900 dark:text-white">Delete this workspace</p>
+                                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                                    Permanent, and it takes everyone's access with it. We wait
+                                                    {{ App\Models\DataRequest::DELETION_GRACE_DAYS }} days first so you can change your mind.
+                                                </p>
+                                            </div>
+                                            <button type="button" x-on:click="open = !open"
+                                                    class="flex-shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50 dark:text-rose-400 dark:ring-rose-500/30 dark:hover:bg-rose-500/10">
+                                                Delete workspace
+                                            </button>
+                                        </div>
+
+                                        <form x-show="open" x-cloak method="POST" action="{{ route('data.delete') }}" class="mt-4 space-y-4">
+                                            @csrf
+
+                                            <p class="text-sm text-slate-600 dark:text-slate-300">
+                                                Consider exporting your data first — the deletion will wait.
+                                            </p>
+
+                                            <div>
+                                                <label for="confirmation" class="input-label">
+                                                    Type <span class="font-mono font-bold text-slate-900 dark:text-white">{{ $tenant?->name }}</span> to confirm
+                                                </label>
+                                                <input id="confirmation" name="confirmation" type="text" autocomplete="off"
+                                                       class="input @error('confirmation') ring-rose-400 @enderror">
+                                                @error('confirmation')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
+                                            </div>
+
+                                            <div>
+                                                <label for="delete-password" class="input-label">Your password</label>
+                                                <input id="delete-password" name="password" type="password" autocomplete="current-password"
+                                                       class="input @error('password') ring-rose-400 @enderror">
+                                                @error('password')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
+                                            </div>
+
+                                            <div>
+                                                <label for="delete-reason" class="input-label">Why are you leaving? <span class="font-normal text-slate-400">(optional)</span></label>
+                                                <select id="delete-reason" name="reason" class="input">
+                                                    <option value="">Prefer not to say</option>
+                                                    @foreach(App\Models\Subscription::CANCELLATION_REASONS as $value => $label)
+                                                        <option value="{{ $value }}">{{ $label }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+
+                                            <div class="flex justify-end gap-2">
+                                                <x-button type="button" variant="secondary" x-on:click="open = false">Keep my workspace</x-button>
+                                                <x-button type="submit" variant="ghost">Schedule deletion</x-button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                @else
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                                        Only the workspace owner can delete the workspace.
+                                    </p>
+                                @endif
+                            </div>
+                        </div>
+                    </x-card>
                 </div>
         </div>
     </div>

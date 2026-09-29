@@ -52,6 +52,8 @@ migrate/rollback job and a dependency audit.
 | Lifecycle email goes through `LifecycleMessenger::sendOnce()`, never `Notification::send()` | The unique claim in `lifecycle_messages` is the only thing stopping a duplicate "your card was declined" — which reads as a second decline. |
 | An onboarding step must assert against real state, never a toast | The first-run wizard faked three successes with `setTimeout` and persisted nothing; new customers were congratulated and then could not send. |
 | An operator setting must be read by something | "Allow new signups" was written to the database and honoured by nothing; `platform.name` had no config key to override. |
+| A security-relevant account change must notify the account | Email, password and two-factor changes were silent — the exact recipe for account takeover. An email change warns the *old* address. |
+| Never delete customer data to enforce a limit | A downgrade leaves a workspace over its ceiling. Surface it; refuse additions; never trim. |
 
 ## Layout
 
@@ -62,6 +64,7 @@ migrate/rollback job and a dependency audit.
 | `app/Services/` | Domain logic (SMTP pool, CSV import, bounce classification, metrics) |
 | `app/Support/` | Small stateless helpers (signed links, redirect allow-list) |
 | `app/Lifecycle/` | Exactly-once customer messaging (`LifecycleMessenger`) |
+| `app/Notifications/Security/` | Mandatory account-security alerts; never opt-out-able |
 | `app/Notifications/Lifecycle/` | The thirteen lifecycle emails; content is data, one shared template |
 | `app/Jobs/` | Queued work; every job declares its lane (`high` / `default` / `low`) |
 | `tests/Feature/Regression/` | One file per defect that reached `main`; the header explains the original failure |

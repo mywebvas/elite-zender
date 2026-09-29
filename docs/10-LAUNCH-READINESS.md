@@ -12,7 +12,7 @@ as **open** is a deliberate decision with a reason.
 | --- | --- | --- |
 | Code style | `composer lint` | pass — 281 files |
 | Static analysis | `composer analyse` (PHPStan 6) | pass — 0 errors |
-| Tests | `composer test` | **609 passing**, 2 skipped, 1,715 assertions |
+| Tests | `composer test` | **632 passing**, 2 skipped, 1,786 assertions |
 | Front-end build | `npm run build` | pass, deterministic |
 | Schema | migrate + rollback + re-migrate | pass |
 | Production image | `docker build .` | now built in CI |
@@ -194,6 +194,52 @@ server state and this codebase made that same mistake three times.
 
 ---
 
+## Third pass — security, the plan ceiling, and leaving
+
+### Account changes happened in silence
+
+Changing the email, changing the password and switching off two-factor
+produced no notification at all. That is the standard account-takeover
+recipe: obtain a session, change the address, reset the password to one you
+control. Every step is a legitimate action by an authenticated user, so
+nothing else in the stack objects.
+
+An email change now warns the **old** address — the only inbox the real
+owner still controls — and password changes, resets and two-factor changes
+all confirm to the account. None of them are opt-out-able.
+
+### A downgrade left customers above the ceiling, silently
+
+Dropping from Growth to Free leaves ten seats on a one-seat plan and twenty
+thousand contacts on a five-hundred plan. Nothing deleted the excess, which
+is right — silently destroying a contact list to fit a cheaper plan is the
+one unforgivable behaviour here — but nothing *said* anything either, so the
+limit was met as a silent refusal months later.
+
+`PlanGate::overages()` now names exactly what is over and by how much; it
+appears on every page and in one email a month, and leads with the promise
+that nothing will be deleted.
+
+### Leaving was a favour, not a right
+
+GDPR Articles 15 and 17 were an email to an operator. Both are now buttons.
+
+- **Export** streams a zip of contacts, lists, campaigns, engagement, team
+  and relay configuration as UTF-8 CSV with a BOM. Credentials are excluded
+  by design — an export travels through a mail server, a downloads folder, a
+  laptop. Served behind the session, never a public link, shredded after
+  seven days.
+- **Deletion** is owner-only, re-authenticated, requires typing the
+  workspace name, and is *scheduled* with a seven-day window that one click
+  cancels. A cooling-off period turns an angry Friday click into a Monday
+  decision.
+- **Suppression survives erasure.** Those rows are one-way hashes with no
+  addresses in them, and they exist because a recipient asked never to be
+  emailed again. That promise was made to them, not to the workspace, so
+  they are detached rather than cascaded.
+
+---
+
 ## Open, deliberately
 
 1. **No scoped API tokens** — a Sanctum token carries its owner's full rights.
@@ -208,8 +254,13 @@ server state and this codebase made that same mistake three times.
 7. **One account belongs to one workspace.** `users.email` is globally
    unique, so the same person cannot be a member of two workspaces. Agencies
    will hit this; fixing it means a join table and a workspace switcher.
-8. **No self-service data export or account deletion.** GDPR Art. 15/17
-   requests are currently an operator task rather than a button.
+8. **No "new sign-in from an unrecognised device" alert.** The other
+   security events are covered; this one needs device fingerprinting and a
+   trusted-device store to avoid alerting on every browser restart.
+9. **Annual billing is not offered.** `plans.interval` exists and is unused.
+   Annual plans are the standard lever for both conversion and retention,
+   but they need proration across intervals and renewal maths that deserve
+   their own pass.
 
 ---
 

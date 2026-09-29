@@ -6,6 +6,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — account security, life above the plan ceiling, and leaving
+
+- **Security alerts.** Changing the account email, changing the password,
+  resetting it, and switching two-factor on or off all happened in complete
+  silence. That is the recipe for account takeover: get a session, change
+  the address, then reset the password to one you control — every step a
+  legitimate action by an authenticated user, so nothing else objects. An
+  email change now warns the **old** address, because that is the only inbox
+  the real owner still controls. None of these can be switched off.
+- **Plan-limit overages.** A downgrade leaves a workspace holding more than
+  the new tier allows — ten seats on a one-seat plan, twenty thousand
+  contacts on a five-hundred plan. Nothing deleted it, which is correct, and
+  nothing mentioned it, which is not: customers met the limit as a silent
+  refusal months later. Now named on every page and in one email a month,
+  with an explicit promise that nothing will be deleted.
+- **Data export (GDPR Art. 15).** A streamed zip of contacts, lists,
+  campaigns, engagement history, team and relay configuration as UTF-8 CSV
+  with a BOM so Excel renders it correctly. Credentials are deliberately
+  excluded — an export travels, and a bearer credential against a customer's
+  sending domain has no business in one. Served behind the session, never a
+  public link, and shredded automatically after seven days.
+- **Workspace deletion (GDPR Art. 17).** Owner-only, re-authenticated,
+  requires typing the workspace name, and *scheduled* with a seven-day
+  cooling-off window that one click cancels. `suppression_entries` are
+  detached rather than cascaded: they hold one-way hashes and no addresses,
+  and they exist because a recipient asked never to be emailed again — a
+  promise made to them, not to the workspace.
+- **`elitesender:process-data-requests`**, hourly, with `--dry-run`.
+
+
 ### Added — team seats, and the lifecycle gaps that survived the first pass
 
 - **Team members.** Every plan sold seats — Free 1, Starter 3, Growth 10,

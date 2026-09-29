@@ -69,6 +69,11 @@ class ResolveTenant
             return null;
         }
 
+        // Above the plan after a downgrade. Ranked below billing failures
+        // (nothing is broken) but above the softer nudges, because the next
+        // thing this customer does is likely to be refused.
+        $overages = $planGate->overages($tenant);
+
         $openInvoice = \App\Models\Invoice::withoutGlobalScopes()
             ->where('tenant_id', $tenant->getKey())
             ->where('status', \App\Models\Invoice::STATUS_OPEN)
@@ -103,6 +108,19 @@ class ResolveTenant
                     $openInvoice->number,
                 ),
                 'action' => $payAction,
+            ],
+
+            $overages !== [] => [
+                'tone' => 'warning',
+                'message' => sprintf(
+                    'Your workspace is above the %s plan limits (%s). Nothing has been deleted — you just cannot add more until you are back inside the plan.',
+                    $subscription->planName(),
+                    implode(', ', array_map(
+                        static fn (array $o): string => number_format($o['over']).' '.$o['label'].' over',
+                        $overages,
+                    )),
+                ),
+                'action' => ['label' => 'Review plans', 'url' => route('billing.index')],
             ],
 
             $subscription->isEnding() => [

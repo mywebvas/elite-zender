@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\Lifecycle\ActivationNudge;
 use App\Notifications\Lifecycle\CardExpiring;
 use App\Notifications\Lifecycle\InvoiceReminder;
+use App\Notifications\Lifecycle\PlanLimitsExceeded;
 use App\Notifications\Lifecycle\RenewalReminder;
 use App\Notifications\Lifecycle\SuspensionWarning;
 use App\Notifications\Lifecycle\TrialEnding;
@@ -67,6 +68,7 @@ class RunLifecycle extends Command
         $this->invoicesUnpaid($messenger);
         $this->suspensionsApproaching($messenger);
         $this->allowancesRunningOut($messenger, $planGate);
+        $this->overPlanLimits($messenger, $planGate);
         $this->winBacks($messenger);
 
         foreach ($this->tally as $label => $count) {
@@ -397,6 +399,49 @@ class RunLifecycle extends Command
 
                         break;
                     }
+                }
+            });
+    }
+
+    /**
+     * Workspaces sitting above what their plan allows.
+     *
+     * Almost always the tail of a downgrade: ten seats on a one-seat tier,
+     * twenty thousand contacts on a five-hundred tier. Nothing is deleted —
+     * that would be unforgivable — so the customer has to be *told*, or they
+     * find out months later when an invitation silently refuses.
+     *
+     * Keyed by month so a workspace that stays over is reminded occasionally
+     * rather than every hour, and never at all once it is back inside.
+     */
+    private function overPlanLimits(LifecycleMessenger $messenger, PlanGate $planGate): void
+    {
+        $period = now()->format('Y-m');
+
+        Subscription::withoutGlobalScopes()
+            ->with(['plan', 'tenant'])
+            ->whereIn('status', [Subscription::STATUS_ACTIVE, Subscription::STATUS_PAST_DUE])
+            ->chunkById(100, function ($subscriptions) use ($messenger, $planGate, $period): void {
+                foreach ($subscriptions as $subscription) {
+                    $tenant = $subscription->tenant;
+
+                    if ($tenant === null) {
+                        continue;
+                    }
+
+                    $overages = $planGate->overages($tenant);
+
+                    if ($overages === []) {
+                        continue;
+                    }
+
+                    $this->deliver(
+                        $messenger,
+                        $tenant,
+                        'over_limit:'.$period,
+                        fn () => new PlanLimitsExceeded($subscription, $overages),
+                        'plan limit notices',
+                    );
                 }
             });
     }

@@ -118,6 +118,57 @@ final class PlanGate
         return $snapshot;
     }
 
+    /**
+     * Where a workspace currently sits above its plan.
+     *
+     * A downgrade — chosen, or applied when a cancellation reaches period
+     * end — leaves the workspace holding more than the new plan allows: ten
+     * seats on a one-seat tier, twenty thousand contacts on a five-hundred
+     * tier. Nothing deletes that, and nothing should: silently destroying a
+     * customer's contact list to fit a cheaper plan is the single most
+     * unforgivable thing a tool like this could do.
+     *
+     * So the overage is surfaced rather than enforced destructively. Adding
+     * *more* is already blocked by `allows()`; this is what lets the product
+     * say which limit, by how much, and what to do about it — instead of a
+     * customer discovering it when an invitation silently fails.
+     *
+     * @return array<string, array{used: int, limit: int, over: int, label: string}>
+     */
+    public function overages(Tenant $tenant): array
+    {
+        $labels = [
+            'users' => 'team members',
+            'contacts' => 'contacts',
+            'smtp_accounts' => 'SMTP relays',
+        ];
+
+        $overages = [];
+
+        foreach ($labels as $limit => $label) {
+            $max = $this->limitFor($tenant, $limit);
+
+            // Unlimited, or a plan that allows none of something, is not an
+            // overage to nag about — the latter is a feature gate.
+            if ($max === null || $max <= 0) {
+                continue;
+            }
+
+            $used = $this->usage($tenant, $limit);
+
+            if ($used > $max) {
+                $overages[$limit] = [
+                    'used' => $used,
+                    'limit' => $max,
+                    'over' => $used - $max,
+                    'label' => $label,
+                ];
+            }
+        }
+
+        return $overages;
+    }
+
     /** Is the workspace entitled to send at all? */
     public function canSend(Tenant $tenant): bool
     {

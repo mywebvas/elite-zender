@@ -10,6 +10,7 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ContactListController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DataRequestController;
 use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\SettingsController;
@@ -128,6 +129,20 @@ Route::middleware(['auth:web'])->group(function (): void {
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
     Route::put('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications');
     Route::put('/settings/imap', [SettingsController::class, 'updateImap'])->name('settings.imap');
+
+    /*
+     * Right of access and right to erasure (GDPR Art. 15 / 17), self-service.
+     * Deletion is scheduled rather than immediate — a cooling-off window
+     * turns an angry click into a recoverable decision.
+     */
+    Route::post('/settings/data/export', [DataRequestController::class, 'export'])
+        ->middleware('throttle:3,60')
+        ->name('data.export');
+    Route::get('/settings/data/{dataRequest}/download', [DataRequestController::class, 'download'])->name('data.download');
+    Route::post('/settings/data/delete', [DataRequestController::class, 'requestDeletion'])
+        ->middleware('throttle:5,60')
+        ->name('data.delete');
+    Route::delete('/settings/data/{dataRequest}', [DataRequestController::class, 'cancelDeletion'])->name('data.delete.cancel');
 
     /*
      * Team seats. Every plan sells them; until now nothing could fill one.

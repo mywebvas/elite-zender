@@ -37,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->registerSecurityAlerts();
         $this->applyPlatformSettings();
         $this->configureModels();
         $this->configureDates();
@@ -44,6 +45,33 @@ class AppServiceProvider extends ServiceProvider
         $this->configureUrls();
         $this->configureThrottling();
         $this->registerRateLimiters();
+    }
+
+    /**
+     * Account-security events become messages the owner can act on.
+     *
+     * Disabling two-factor is the most valuable thing an attacker can do
+     * after taking a session — it removes the control that would stop them
+     * coming back — and it happened in total silence.
+     */
+    private function registerSecurityAlerts(): void
+    {
+        $listener = \App\Listeners\SendSecurityAlerts::class;
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Laravel\Fortify\Events\TwoFactorAuthenticationConfirmed::class,
+            [$listener, 'twoFactorConfirmed'],
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Laravel\Fortify\Events\TwoFactorAuthenticationDisabled::class,
+            [$listener, 'twoFactorDisabled'],
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Laravel\Fortify\Events\RecoveryCodesGenerated::class,
+            [$listener, 'recoveryCodesGenerated'],
+        );
     }
 
     /**

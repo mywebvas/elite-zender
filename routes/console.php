@@ -1,6 +1,7 @@
 <?php
 
 use App\Console\Commands\FinaliseCampaigns;
+use App\Console\Commands\ProcessDataRequests;
 use App\Console\Commands\PurgeAuditLogs;
 use App\Console\Commands\ResetDailySmtpQuotas;
 use App\Console\Commands\RunAutomations;
@@ -70,6 +71,14 @@ Schedule::command(RunLifecycle::class)
     ->withoutOverlapping()
     ->onOneServer()
     ->runInBackground();
+
+// Erasure requests whose cooling-off window has closed, and exports that
+// have aged out. Hourly rather than daily so "deleted on the 14th" means the
+// 14th, not "some time on the 15th".
+Schedule::command(ProcessDataRequests::class)
+    ->hourlyAt(40)
+    ->withoutOverlapping()
+    ->onOneServer();
 
 Schedule::command(PurgeAuditLogs::class)
     ->dailyAt('03:15')

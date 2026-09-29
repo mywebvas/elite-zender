@@ -9,7 +9,7 @@
   <img alt="PHP 8.4+" src="https://img.shields.io/badge/PHP-8.4%2B-777BB4?logo=php&logoColor=white">
   <img alt="Laravel 13" src="https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white">
   <img alt="PostgreSQL 17" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-609%20passing-3FB950">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-632%20passing-3FB950">
   <img alt="PHPStan level 6" src="https://img.shields.io/badge/PHPStan-level%206-2A6FDB">
 </p>
 
@@ -50,6 +50,9 @@ same audience so the next send is cleaner than the last.
 | Team seats: invitations, roles, revocation, seat-limit enforcement | ✅ |
 | Activation drip, card-expiry warnings, post-campaign reports | ✅ |
 | Per-user email preferences (billing and security always on) | ✅ |
+| Security alerts on email, password and two-factor changes | ✅ |
+| Plan-limit overage handling after a downgrade (nothing deleted) | ✅ |
+| Self-service data export and scheduled workspace deletion (GDPR 15/17) | ✅ |
 
 ---
 

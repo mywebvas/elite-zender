@@ -22,6 +22,12 @@ class WorkspaceWelcome extends LifecycleNotification
         parent::__construct();
     }
 
+    /** Onboarding guidance rather than a contractual notice. */
+    public function category(): string
+    {
+        return 'product';
+    }
+
     protected function content(User $notifiable): LifecycleContent
     {
         $trialEnds = $this->subscription?->trial_ends_at;

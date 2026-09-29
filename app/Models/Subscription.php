@@ -65,6 +65,7 @@ class Subscription extends Model
         'cancel_at', 'canceled_at', 'cancellation_reason', 'cancellation_feedback',
         'downgraded_at', 'gateway', 'gateway_ref',
         'gateway_customer', 'gateway_token', 'card_brand', 'card_last_four',
+        'card_exp_month', 'card_exp_year',
         'dunning_attempts', 'next_retry_at',
     ];
 
@@ -118,6 +119,23 @@ class Subscription extends Model
         // relation is `mixed` to a Larastan-less analyser, and this states
         // the actual contract — a Plan, or nothing.
         return $plan instanceof Plan ? (string) $plan->name : $fallback;
+    }
+
+    /**
+     * The last moment the saved card still works, or null when we do not
+     * know. A card is valid through the final day of its expiry month.
+     */
+    public function cardExpiresAt(): ?\Illuminate\Support\Carbon
+    {
+        if ($this->card_exp_month === null || $this->card_exp_year === null) {
+            return null;
+        }
+
+        return \Illuminate\Support\Carbon::createFromDate(
+            (int) $this->card_exp_year,
+            (int) $this->card_exp_month,
+            1,
+        )->endOfMonth();
     }
 
     /** Can this subscription renew itself without the customer returning? */

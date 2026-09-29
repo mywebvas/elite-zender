@@ -12,7 +12,7 @@ as **open** is a deliberate decision with a reason.
 | --- | --- | --- |
 | Code style | `composer lint` | pass — 281 files |
 | Static analysis | `composer analyse` (PHPStan 6) | pass — 0 errors |
-| Tests | `composer test` | **565 passing**, 2 skipped, 1,571 assertions |
+| Tests | `composer test` | **609 passing**, 2 skipped, 1,715 assertions |
 | Front-end build | `npm run build` | pass, deterministic |
 | Schema | migrate + rollback + re-migrate | pass |
 | Production image | `docker build .` | now built in CI |
@@ -149,6 +149,51 @@ override, so both resolved to null wherever they were read. All three now work.
 
 ---
 
+## Second pass — the lifecycle gaps that survived the first
+
+### Seats were sold and could not be filled
+
+Every plan advertised team members (Free 1 → Scale 25, Enterprise
+unlimited), the billing page rendered a usage meter against that limit, and
+the plan cards listed it as a headline feature. There was no route, no
+controller and no view. A Growth customer paid $59 a month for nine seats
+that could not exist, and the limit was never enforced because there was
+nothing to enforce it against.
+
+Built: invitations (SHA-256 hashed, single-use, 7-day expiry), role
+management, revoke, resend, and seat accounting that counts **pending
+invitations** — otherwise a three-seat workspace can issue thirty that each
+pass the check individually.
+
+Offboarding is treated as a security event: removing a member revokes their
+sessions and API tokens and notifies them. The last owner cannot be removed
+or demoted, and nobody can demote themselves — both are states you can only
+escape with a support ticket.
+
+### Three features that only pretended to work
+
+| Feature | What it actually did | Consequence |
+| --- | --- | --- |
+| First-run wizard | `setTimeout` then "SMTP Connected Successfully" / "Contacts imported" | Fixed in pass one |
+| SMTP "Test connection" | `setTimeout(1500)` then "Connection test successful!" | Customers learned the truth when their first campaign silently failed, with the relay already in rotation |
+| IMAP settings form | No `action`; button fired "IMAP Settings saved successfully" | `ScanBounces` skipped every workspace on every 15-minute run — the entire Bounce Shield feature was unreachable while claiming to be configured |
+
+All three are now real. An architecture test fails the build on any
+client-side success toast, because a success message is a statement about
+server state and this codebase made that same mistake three times.
+
+### Revenue leaks closed
+
+| Leak | Fix |
+| --- | --- |
+| Signed up, never activated — one welcome email then silence forever | Two nudges (day 2, day 6) naming the single blocking step, both stopping the moment it is done |
+| Card expiry discarded by both gateways | Captured on first charge, warned 14 days out. Involuntary churn is the cheapest kind to prevent and the most infuriating to lose |
+| Nothing to come back for | A performance report when a campaign finishes — the retention loop for a product whose value is measurement |
+| No opt-out on non-transactional mail | Setup nudges and reports are opt-out; billing and security are mandatory by construction |
+| Verification and reset emails looked like a different product | Both now use the product's own shell |
+
+---
+
 ## Open, deliberately
 
 1. **No scoped API tokens** — a Sanctum token carries its owner's full rights.
@@ -160,6 +205,11 @@ override, so both resolved to null wherever they were read. All three now work.
    per-recipient delivery ledger (or `Bus::batch`) closes this properly.
 6. **Automation sends record no `CampaignEvent`**, so automation open rates
    use the broadcast denominator.
+7. **One account belongs to one workspace.** `users.email` is globally
+   unique, so the same person cannot be a member of two workspaces. Agencies
+   will hit this; fixing it means a join table and a workspace switcher.
+8. **No self-service data export or account deletion.** GDPR Art. 15/17
+   requests are currently an operator task rather than a button.
 
 ---
 

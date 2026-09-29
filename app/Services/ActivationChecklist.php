@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Campaign;
 use App\Models\Contact;
 use App\Models\SmtpAccount;
+use App\Models\User;
 use Illuminate\Support\Facades\Auth;
 
 /**
@@ -22,15 +23,19 @@ use Illuminate\Support\Facades\Auth;
 final class ActivationChecklist
 {
     /**
+     * @param  User|null  $for  whose verification state to read; defaults to
+     *                          the signed-in user
      * @return list<array{
      *     key: string, label: string, help: string, done: bool,
      *     url: string, cta: string
      * }>
      */
-    public function steps(): array
+    public function steps(?User $for = null): array
     {
-        /** @var \App\Models\User|null $user */
-        $user = Auth::user();
+        // Explicit subject where there is one (the scheduler has no session),
+        // falling back to the signed-in user for ordinary requests.
+        $user = $for ?? Auth::user();
+        $user = $user instanceof User ? $user : null;
 
         return [
             [
@@ -79,9 +84,9 @@ final class ActivationChecklist
     /**
      * @return array{steps: list<array<string, mixed>>, completed: int, total: int, percent: int, next: array<string, mixed>|null, complete: bool}
      */
-    public function summary(): array
+    public function summary(?User $for = null): array
     {
-        $steps = $this->steps();
+        $steps = $this->steps($for);
         $completed = count(array_filter($steps, static fn (array $step): bool => $step['done']));
         $total = count($steps);
 

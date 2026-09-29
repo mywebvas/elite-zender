@@ -187,29 +187,116 @@
                                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Configure IMAP to automatically scan your inbox for bounced emails and suppress them.</p>
                             </div>
                         </div>
-                        <div class="p-6 space-y-6">
-                            <div class="grid grid-cols-2 gap-4">
+                        {{--
+                            This form used to have no action and a button that
+                            fired `window.$toast('IMAP Settings saved
+                            successfully')`. Nothing was ever written, so
+                            `ScanBounces` skipped every workspace on every
+                            15-minute run and the entire Bounce Shield feature
+                            was unreachable — while telling the customer it had
+                            been configured.
+                        --}}
+                        <form method="POST" action="{{ route('settings.imap') }}" class="p-6 space-y-6">
+                            @csrf
+                            @method('PUT')
+
+                            @php $imap = $tenant?->setting('imap') ?? []; @endphp
+
+                            <div class="grid gap-4 sm:grid-cols-2">
                                 <div>
-                                    <label class="input-label">IMAP Host</label>
-                                    <input type="text" class="input" placeholder="imap.gmail.com">
+                                    <label for="imap_host" class="input-label">IMAP host</label>
+                                    <input id="imap_host" name="host" type="text" class="input @error('host') ring-rose-400 @enderror"
+                                           value="{{ old('host', $imap['host'] ?? '') }}" placeholder="imap.gmail.com">
+                                    @error('host')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                                 </div>
                                 <div>
-                                    <label class="input-label">IMAP Port</label>
-                                    <input type="number" class="input" placeholder="993">
+                                    <label for="imap_port" class="input-label">Port</label>
+                                    <input id="imap_port" name="port" type="number" class="input @error('port') ring-rose-400 @enderror"
+                                           value="{{ old('port', $imap['port'] ?? 993) }}" placeholder="993">
+                                    @error('port')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                                 </div>
                                 <div>
-                                    <label class="input-label">Email Address</label>
-                                    <input type="email" class="input" placeholder="bounces@yourdomain.com">
+                                    <label for="imap_username" class="input-label">Mailbox address</label>
+                                    <input id="imap_username" name="username" type="text" class="input @error('username') ring-rose-400 @enderror"
+                                           value="{{ old('username', $imap['username'] ?? '') }}" placeholder="bounces@yourdomain.com">
+                                    @error('username')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                                 </div>
                                 <div>
-                                    <label class="input-label">Password / App Password</label>
-                                    <input type="password" class="input" placeholder="********">
+                                    <label for="imap_password" class="input-label">
+                                        Password / app password
+                                        @if(filled($imap['password'] ?? null))
+                                            <span class="font-normal text-slate-400">— leave blank to keep the current one</span>
+                                        @endif
+                                    </label>
+                                    <input id="imap_password" name="password" type="password" autocomplete="new-password"
+                                           class="input @error('password') ring-rose-400 @enderror"
+                                           placeholder="{{ filled($imap['password'] ?? null) ? '••••••••' : 'App password' }}">
+                                    @error('password')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="imap_encryption" class="input-label">Encryption</label>
+                                    <select id="imap_encryption" name="encryption" class="input">
+                                        <option value="ssl" @selected(old('encryption', $imap['encryption'] ?? 'ssl') === 'ssl')>SSL / TLS (993)</option>
+                                        <option value="none" @selected(old('encryption', $imap['encryption'] ?? 'ssl') === 'none')>None (143)</option>
+                                    </select>
                                 </div>
                             </div>
-                            <div class="flex justify-end">
-                                <x-button @click="window.$toast('IMAP Settings saved successfully', 'success')" variant="primary">Save Configuration</x-button>
+
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                Point this at the mailbox your relays deliver bounces to. We read it every 15 minutes,
+                                classify hard bounces and complaints, and suppress those addresses automatically.
+                                The password is encrypted at rest.
+                            </p>
+
+                            <div class="flex items-center justify-end gap-3">
+                                @if(filled($imap['host'] ?? null))
+                                    <button type="submit" name="disconnect" value="1"
+                                            class="rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">
+                                        Disconnect
+                                    </button>
+                                @endif
+                                <x-button type="submit" variant="primary">Save configuration</x-button>
                             </div>
+                        </form>
+                    </x-card>
+
+                    {{-- Email preferences --}}
+                    <x-card>
+                        <div class="border-b border-slate-200 p-6 dark:border-white/10">
+                            <h3 class="text-lg font-medium text-slate-900 dark:text-white">Email preferences</h3>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                What we send <em>you</em>. Billing and security notices are always on —
+                                they are the ones you would be furious to have missed.
+                            </p>
                         </div>
+
+                        <form method="POST" action="{{ route('settings.notifications') }}" class="space-y-5 p-6">
+                            @csrf
+                            @method('PUT')
+
+                            @foreach(App\Models\User::OPTIONAL_NOTIFICATIONS as $key => $meta)
+                                <label class="flex cursor-pointer items-start gap-3">
+                                    <input type="checkbox" name="{{ $key }}" value="1"
+                                           @checked(auth()->user()->wantsNotification($key))
+                                           class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-white/20 dark:bg-white/5">
+                                    <span>
+                                        <span class="block text-sm font-medium text-slate-900 dark:text-white">{{ $meta['label'] }}</span>
+                                        <span class="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">{{ $meta['help'] }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                                <span class="font-semibold text-slate-900 dark:text-white">Always on:</span>
+                                invoices and receipts, failed payments, anything before your sending is
+                                paused, and security notices such as a password change or a seat being
+                                removed.
+                            </div>
+
+                            <div class="flex justify-end">
+                                <x-button type="submit" variant="primary">Save preferences</x-button>
+                            </div>
+                        </form>
                     </x-card>
                 </div>
         </div>

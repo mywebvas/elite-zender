@@ -6,8 +6,12 @@ use App\Actions\Fortify\CreateNewUser;
 use App\Actions\Fortify\ResetUserPassword;
 use App\Actions\Fortify\UpdateUserPassword;
 use App\Actions\Fortify\UpdateUserProfileInformation;
+use App\Notifications\LifecycleContent;
+use Illuminate\Auth\Notifications\ResetPassword;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
+use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -36,6 +40,7 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::redirectUserForTwoFactorAuthenticationUsing(RedirectIfTwoFactorAuthenticatable::class);
 
         $this->registerViews();
+        $this->brandAuthEmails();
 
         RateLimiter::for('login', function (Request $request) {
             $throttleKey = Str::transliterate(Str::lower((string) $request->input(Fortify::username())).'|'.$request->ip());
@@ -86,6 +91,82 @@ class FortifyServiceProvider extends ServiceProvider
      * challenge is the worst of them: enabling 2FA locked the user out of
      * their own workspace with no way back in.
      */
+    /**
+     * Put the two highest-trust emails in the product's own shell.
+     *
+     * "Verify your email address" and "Reset password" were stock Laravel
+     * markdown: a different typeface, a different button, no product name,
+     * no support address. Those two messages arrive at the exact moments a
+     * customer is deciding whether to trust the thing with their data, and
+     * looking like a different application at that moment is the one place
+     * inconsistency actually costs money — it is also precisely what a
+     * phishing page looks like.
+     */
+    private function brandAuthEmails(): void
+    {
+        VerifyEmail::toMailUsing(function (object $notifiable, string $url): MailMessage {
+            $content = new LifecycleContent(
+                subject: 'Confirm your email address',
+                heading: 'Confirm your email address',
+                greetingName: $this->firstName($notifiable),
+                lines: [
+                    'One click and your workspace is fully unlocked. We ask because this platform sends email on your behalf — confirming you own this address is what protects your deliverability, and everybody else\'s.',
+                    'Everything else already works: connect a relay, import contacts, build a campaign. Only sending waits on this.',
+                ],
+                eyebrow: 'Almost there',
+                preheader: 'One click unlocks sending on your workspace.',
+                actionLabel: 'Confirm my email',
+                actionUrl: $url,
+                outro: ['If you did not create an account, ignore this email and nothing further will happen.'],
+            );
+
+            return (new MailMessage)
+                ->subject($content->subject)
+                ->view('emails.lifecycle', ['content' => $content])
+                ->text('emails.lifecycle-plain', ['content' => $content]);
+        });
+
+        ResetPassword::toMailUsing(function (object $notifiable, string $token): MailMessage {
+            $url = url(route('password.reset', [
+                'token' => $token,
+                'email' => $notifiable->getEmailForPasswordReset(),
+            ], false));
+
+            $minutes = (int) config('auth.passwords.'.config('auth.defaults.passwords').'.expire', 60);
+
+            $content = new LifecycleContent(
+                subject: 'Reset your password',
+                heading: 'Reset your password',
+                greetingName: $this->firstName($notifiable),
+                lines: [
+                    sprintf('Somebody asked to reset the password for this account. The link below is good for %d minutes and can be used once.', $minutes),
+                ],
+                eyebrow: 'Security',
+                preheader: sprintf('This link works once and expires in %d minutes.', $minutes),
+                actionLabel: 'Choose a new password',
+                actionUrl: url($url),
+                outro: [
+                    'If this was not you, no action is needed — your password has not changed and this link will expire on its own. If you get these repeatedly, tell us at '
+                    .config('platform.support_email').'.',
+                ],
+                tone: 'warning',
+            );
+
+            return (new MailMessage)
+                ->subject($content->subject)
+                ->view('emails.lifecycle', ['content' => $content])
+                ->text('emails.lifecycle-plain', ['content' => $content]);
+        });
+    }
+
+    private function firstName(object $notifiable): string
+    {
+        $name = trim((string) ($notifiable->name ?? ''));
+        $first = trim(explode(' ', $name)[0] ?? '');
+
+        return $first !== '' ? $first : 'there';
+    }
+
     private function registerViews(): void
     {
         Fortify::loginView(fn () => view('auth.login'));

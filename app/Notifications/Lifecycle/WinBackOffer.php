@@ -22,6 +22,12 @@ class WinBackOffer extends LifecycleNotification
         parent::__construct();
     }
 
+    /** A check-in, not a service message: opt-out-able. */
+    public function category(): string
+    {
+        return 'product';
+    }
+
     protected function content(User $notifiable): LifecycleContent
     {
         return new LifecycleContent(

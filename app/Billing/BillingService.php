@@ -704,6 +704,8 @@ final class BillingService
             'gateway_customer' => $credential->customer,
             'card_brand' => $credential->brand,
             'card_last_four' => $credential->lastFour,
+            'card_exp_month' => $credential->expMonth,
+            'card_exp_year' => $credential->expYear,
         ])->save();
     }
 

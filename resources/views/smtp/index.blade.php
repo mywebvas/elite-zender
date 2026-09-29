@@ -53,10 +53,22 @@
                                 <button type="submit" class="text-xs font-medium text-rose-600 hover:text-rose-500 dark:text-rose-400">Delete</button>
                             </form>
                         </div>
-                        <button @click="testing = true; setTimeout(() => { testing = false; window.$toast('Connection test successful!', 'success'); }, 1500)" class="text-xs font-medium text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-200 flex items-center gap-1">
-                            <span x-show="!testing">Test Connection</span>
-                            <span x-show="testing">Testing...</span>
-                        </button>
+                        {{--
+                            This used to be a 1.5-second setTimeout followed by
+                            a "Connection test successful!" toast: it told every
+                            customer their credentials worked without opening a
+                            socket. Now it posts, opens a real SMTP session and
+                            reports what the relay actually said.
+                        --}}
+                        <form method="POST" action="{{ route('smtp-accounts.test', $account->id) }}"
+                              x-data="{ testing: false }" @submit="testing = true">
+                            @csrf
+                            <button type="submit" :disabled="testing"
+                                    class="flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-slate-900 disabled:opacity-60 dark:text-slate-400 dark:hover:text-slate-200">
+                                <span x-show="!testing">Test connection</span>
+                                <span x-show="testing" x-cloak>Connecting…</span>
+                            </button>
+                        </form>
                     </div>
                 </x-card>
             @empty

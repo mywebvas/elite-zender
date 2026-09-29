@@ -6,6 +6,51 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — team seats, and the lifecycle gaps that survived the first pass
+
+- **Team members.** Every plan sold seats — Free 1, Starter 3, Growth 10,
+  Scale 25, Enterprise unlimited — the billing page rendered a usage meter
+  against that limit, and the plan cards advertised "10 team members" as a
+  headline feature. There was no route, no controller and no view: a Growth
+  customer paid $59 a month for nine seats that could not exist. Invitations
+  (hashed, single-use, expiring), role management, revocation, resend, and a
+  seat count that includes pending invitations so the number on the pricing
+  page means something.
+- **Offboarding is a security event.** Removing a member revokes their
+  sessions and API tokens and tells them it happened; the last owner cannot
+  be removed or demoted, and nobody can demote themselves.
+- **Activation drip.** A workspace that signs up and never connects a relay
+  got one welcome email and then silence forever — the biggest leak in the
+  funnel. Two nudges, at day 2 and day 6, naming the single blocking step,
+  both stopping the moment it is done.
+- **Card-expiry warnings.** Both gateways return the expiry on the first
+  charge and it was being discarded, so involuntary churn was only ever
+  discovered as a decline. Captured now, and warned 14 days out.
+- **Campaign reports.** A performance summary when a campaign finishes
+  delivering — the retention loop for a product whose value is measurement,
+  and event-driven rather than a digest that sometimes has nothing to say.
+- **Email preferences.** Setup nudges and campaign reports are opt-out.
+  Billing and security notices are not, by construction rather than by a
+  check somebody can forget.
+- Verification and password-reset emails now use the product's own shell
+  instead of stock Laravel markdown.
+
+### Fixed — three features that only pretended to work
+
+- **The SMTP "Test connection" button never opened a socket.** It waited 1.5
+  seconds and toasted "Connection test successful!". Customers learned the
+  truth when their first campaign silently failed, by which point the relay
+  was in rotation and the failures looked like a deliverability problem. It
+  now performs a real handshake and records the result on the relay.
+- **The IMAP settings form had no action.** The save button fired a success
+  toast and wrote nothing, so `ScanBounces` skipped every workspace on every
+  15-minute run and the entire Bounce Shield feature was unreachable — while
+  telling the customer it was configured. The form now saves, the password is
+  encrypted at rest, and the mailbox can be disconnected.
+- An architecture test now fails the build on any client-side success toast.
+  This codebase shipped that same lie three times.
+
+
 ### Added — the customer lifecycle
 
 Before this the product could take money but could not talk to anyone. Outside

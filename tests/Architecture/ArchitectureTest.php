@@ -110,3 +110,52 @@ it('never binds the tenant context manually outside the tenancy layer', function
 
     expect($offenders)->toBe([], 'Use TenantContext::run() instead: '.implode(', ', $offenders));
 });
+
+/**
+ * No interface element may congratulate the user from the client.
+ *
+ * This codebase shipped the same lie three times: the onboarding wizard
+ * toasted "SMTP Connected Successfully" and "Contacts imported" after a
+ * `setTimeout`, the settings page toasted "IMAP Settings saved successfully"
+ * from a form with no action, and the relay list toasted "Connection test
+ * successful!" without opening a socket. In each case nothing was persisted,
+ * nothing was tested, and the customer was told it had worked.
+ *
+ * A success message is a statement about server state, so it may only come
+ * from the server — `session('success')` after a real round trip. Optimistic
+ * client-side confirmation is banned outright because the failure mode is
+ * silent and the user has no reason to doubt it.
+ */
+it('never confirms success from the client', function (): void {
+    $offenders = [];
+
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(dirname(__DIR__, 2).'/resources/views', RecursiveDirectoryIterator::SKIP_DOTS),
+    );
+
+    foreach ($files as $file) {
+        if (! str_ends_with($file->getFilename(), '.blade.php')) {
+            continue;
+        }
+
+        $relative = str_replace(dirname(__DIR__, 2).'/', '', $file->getPathname());
+
+        foreach (file($file->getPathname()) as $number => $line) {
+            $code = trim($line);
+
+            // Skip prose: several templates document the old mistake.
+            if ($code === '' || str_starts_with($code, '{{--') || str_starts_with($code, '*')) {
+                continue;
+            }
+
+            if (preg_match('/@click[^"\']*\$toast\([^)]*[\'"]success[\'"]/', $code) === 1) {
+                $offenders[] = $relative.':'.($number + 1);
+            }
+        }
+    }
+
+    expect($offenders)->toBe(
+        [],
+        'Success must be confirmed by the server via session("success"), not asserted in the browser: '.implode(', ', $offenders),
+    );
+});

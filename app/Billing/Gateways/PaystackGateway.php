@@ -238,6 +238,8 @@ final class PaystackGateway implements PaymentGateway
                 customer: $raw['customer']['email'] ?? null,
                 brand: $authorization['brand'] ?? null,
                 lastFour: $authorization['last4'] ?? null,
+                expMonth: isset($authorization['exp_month']) ? (int) $authorization['exp_month'] : null,
+                expYear: isset($authorization['exp_year']) ? (int) $authorization['exp_year'] : null,
             )
             : null;
     }

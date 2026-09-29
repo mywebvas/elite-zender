@@ -7,6 +7,7 @@ use App\Services\BounceProcessor;
 use App\Tenancy\TenantContext;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Log;
 
 /**
@@ -69,7 +70,7 @@ class CheckImapBouncesJob implements ShouldQueue
             ($config['encryption'] ?? 'ssl') === 'ssl' ? 'ssl' : 'notls',
         );
 
-        $connection = @imap_open($mailbox, (string) $config['username'], (string) ($config['password'] ?? ''));
+        $connection = @imap_open($mailbox, (string) $config['username'], $this->password($config));
 
         if ($connection === false) {
             Log::error('CheckImapBouncesJob: could not open mailbox', [
@@ -98,6 +99,31 @@ class CheckImapBouncesJob implements ShouldQueue
             ]);
         } finally {
             imap_close($connection);
+        }
+    }
+
+    /**
+     * The mailbox password, decrypted.
+     *
+     * Stored encrypted by the settings form (it is a credential that reads
+     * somebody's inbox). Falls back to the raw value so a config written
+     * before encryption existed still connects instead of silently failing
+     * every scan.
+     *
+     * @param  array<string, mixed>  $config
+     */
+    private function password(array $config): string
+    {
+        $stored = (string) ($config['password'] ?? '');
+
+        if ($stored === '') {
+            return '';
+        }
+
+        try {
+            return Crypt::decryptString($stored);
+        } catch (\Illuminate\Contracts\Encryption\DecryptException) {
+            return $stored;
         }
     }
 }

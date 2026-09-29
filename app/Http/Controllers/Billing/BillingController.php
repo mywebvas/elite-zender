@@ -188,6 +188,8 @@ class BillingController extends Controller
             'gateway_customer' => null,
             'card_brand' => null,
             'card_last_four' => null,
+            'card_exp_month' => null,
+            'card_exp_year' => null,
         ])->save();
 
         return back()->with('success', 'Payment method removed. We will email you an invoice before each renewal.');

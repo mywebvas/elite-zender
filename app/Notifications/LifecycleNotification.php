@@ -33,9 +33,24 @@ abstract class LifecycleNotification extends Notification implements ShouldQueue
     /** Build the message for a specific recipient. */
     abstract protected function content(User $notifiable): LifecycleContent;
 
+    /**
+     * Which preference category this message belongs to.
+     *
+     * Defaults to `billing`, which is mandatory. A message only becomes
+     * optional by saying so — the safe direction for a default.
+     */
+    public function category(): string
+    {
+        return 'billing';
+    }
+
     /** @return list<string> */
     public function via(object $notifiable): array
     {
+        if ($notifiable instanceof User && ! $notifiable->wantsNotification($this->category())) {
+            return [];
+        }
+
         return ['mail'];
     }
 

@@ -7,12 +7,16 @@ use App\Lifecycle\LifecycleMessenger;
 use App\Models\Invoice;
 use App\Models\Subscription;
 use App\Models\Tenant;
+use App\Models\User;
+use App\Notifications\Lifecycle\ActivationNudge;
+use App\Notifications\Lifecycle\CardExpiring;
 use App\Notifications\Lifecycle\InvoiceReminder;
 use App\Notifications\Lifecycle\RenewalReminder;
 use App\Notifications\Lifecycle\SuspensionWarning;
 use App\Notifications\Lifecycle\TrialEnding;
 use App\Notifications\Lifecycle\UsageThresholdReached;
 use App\Notifications\Lifecycle\WinBackOffer;
+use App\Services\ActivationChecklist;
 use Illuminate\Console\Command;
 
 /**
@@ -56,7 +60,9 @@ class RunLifecycle extends Command
             return self::SUCCESS;
         }
 
+        $this->activationStalled($messenger);
         $this->trialsEnding($messenger, $planGate);
+        $this->cardsExpiring($messenger);
         $this->renewalsApproaching($messenger);
         $this->invoicesUnpaid($messenger);
         $this->suspensionsApproaching($messenger);
@@ -72,6 +78,111 @@ class RunLifecycle extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Signed up, never activated — the biggest leak in the funnel.
+     *
+     * A workspace that has not connected a relay cannot send, so it will
+     * never renew and will churn without having been a customer in any
+     * meaningful sense. One welcome email and then silence forever left that
+     * whole cohort on the floor.
+     *
+     * Two nudges, and both stop the moment the blocking step is done. The
+     * checklist is evaluated inside the workspace's own tenant context,
+     * because every step it inspects is a tenant-scoped query.
+     */
+    private function activationStalled(LifecycleMessenger $messenger): void
+    {
+        $checklist = app(ActivationChecklist::class);
+
+        foreach ([1 => 2, 2 => 6] as $nudge => $days) {
+            Tenant::query()
+                ->where('status', Tenant::STATUS_ACTIVE)
+                ->whereBetween('created_at', [now()->subDays($days + 1), now()->subDays($days)])
+                ->chunkById(100, function ($tenants) use ($messenger, $checklist, $nudge): void {
+                    /** @var Tenant $tenant */
+                    foreach ($tenants as $tenant) {
+                        $owner = User::withoutGlobalScopes()
+                            ->where('tenant_id', $tenant->getKey())
+                            ->oldest()
+                            ->first();
+
+                        if ($owner === null) {
+                            continue;
+                        }
+
+                        // Every step the checklist inspects is a
+                        // tenant-scoped query, so it has to run inside the
+                        // workspace; the owner is passed explicitly because
+                        // there is no session out here.
+                        $summary = \App\Tenancy\TenantContext::run(
+                            $tenant,
+                            fn () => $checklist->summary($owner),
+                        );
+
+                        // Activated already, or blocked only on verification
+                        // (which has its own banner and its own email).
+                        if ($summary['complete'] || $summary['next'] === null) {
+                            continue;
+                        }
+
+                        if ($summary['next']['key'] === 'verify') {
+                            continue;
+                        }
+
+                        $this->deliver(
+                            $messenger,
+                            $tenant,
+                            sprintf('activation_nudge:%d', $nudge),
+                            fn () => new ActivationNudge($summary['next'], $nudge),
+                            'activation nudges',
+                        );
+                    }
+                });
+        }
+    }
+
+    /**
+     * Cards that are about to stop working.
+     *
+     * Involuntary churn — a lapse nobody chose, caused by a card ageing out
+     * — is the cheapest kind to prevent and the most infuriating to lose.
+     * Warned before the expiry, so the fix is thirty seconds of admin rather
+     * than a decline, a dunning cycle and an apology.
+     */
+    private function cardsExpiring(LifecycleMessenger $messenger): void
+    {
+        Subscription::withoutGlobalScopes()
+            ->with('tenant')
+            ->whereIn('status', [Subscription::STATUS_ACTIVE, Subscription::STATUS_TRIALING, Subscription::STATUS_PAST_DUE])
+            ->whereNotNull('gateway_token')
+            ->whereNotNull('card_exp_month')
+            ->whereNotNull('card_exp_year')
+            ->chunkById(100, function ($subscriptions) use ($messenger): void {
+                foreach ($subscriptions as $subscription) {
+                    $expiresAt = $subscription->cardExpiresAt();
+
+                    if ($subscription->tenant === null || $expiresAt === null) {
+                        continue;
+                    }
+
+                    $expired = $expiresAt->isPast();
+
+                    // Inside the warning window, or already gone.
+                    if (! $expired && $expiresAt->greaterThan(now()->addDays(14))) {
+                        continue;
+                    }
+
+                    $this->deliver(
+                        $messenger,
+                        $subscription->tenant,
+                        sprintf('card_expiring:%s', $expiresAt->format('Y-m')),
+                        fn () => new CardExpiring($subscription, $expired),
+                        'card expiry notices',
+                    );
+                }
+            });
     }
 
     /**

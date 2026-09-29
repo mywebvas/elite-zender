@@ -10,9 +10,11 @@ use App\Http\Controllers\ContactController;
 use App\Http\Controllers\ContactListController;
 use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InvitationController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SmtpAccountController;
+use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\UnsubscribeController;
 use Illuminate\Support\Facades\Route;
@@ -53,6 +55,19 @@ Route::match(['get', 'post'], '/unsubscribe/{campaign}/{contact}', UnsubscribeCo
 
 /*
 |--------------------------------------------------------------------------
+| Invitations (public — the invitee has no account yet)
+|--------------------------------------------------------------------------
+| The token is the entire boundary: SHA-256 compared against a stored hash,
+| single use, and expiring. Throttled because it is guessable in principle.
+*/
+
+Route::middleware('throttle:6,1')->group(function (): void {
+    Route::get('/invitations/{token}', [InvitationController::class, 'show'])->name('invitations.show');
+    Route::post('/invitations/{token}', [InvitationController::class, 'accept'])->name('invitations.accept');
+});
+
+/*
+|--------------------------------------------------------------------------
 | Authenticated application
 |--------------------------------------------------------------------------
 */
@@ -78,6 +93,10 @@ Route::middleware(['auth:web'])->group(function (): void {
 
     // SMTP pool
     Route::resource('smtp-accounts', SmtpAccountController::class)->except(['create', 'edit', 'show']);
+    // A real handshake, throttled because it opens an outbound socket.
+    Route::post('smtp-accounts/{smtp_account}/test', [SmtpAccountController::class, 'test'])
+        ->middleware('throttle:10,1')
+        ->name('smtp-accounts.test');
 
     // Audience
     Route::resource('lists', ContactListController::class)->except(['create', 'edit', 'show']);
@@ -107,6 +126,24 @@ Route::middleware(['auth:web'])->group(function (): void {
 
     Route::get('/settings', [SettingsController::class, 'edit'])->name('settings.index');
     Route::put('/settings', [SettingsController::class, 'update'])->name('settings.update');
+    Route::put('/settings/notifications', [SettingsController::class, 'updateNotifications'])->name('settings.notifications');
+    Route::put('/settings/imap', [SettingsController::class, 'updateImap'])->name('settings.imap');
+
+    /*
+     * Team seats. Every plan sells them; until now nothing could fill one.
+     * Seat accounting counts pending invitations, so a three-seat workspace
+     * cannot issue thirty that each pass the check individually.
+     */
+    Route::get('/team', [TeamController::class, 'index'])->name('team.index');
+    Route::post('/team/invitations', [TeamController::class, 'invite'])
+        ->middleware('throttle:10,1')
+        ->name('team.invite');
+    Route::post('/team/invitations/{invitation}/resend', [TeamController::class, 'resend'])
+        ->middleware('throttle:10,1')
+        ->name('team.invitations.resend');
+    Route::delete('/team/invitations/{invitation}', [TeamController::class, 'revoke'])->name('team.invitations.revoke');
+    Route::put('/team/members/{user}/role', [TeamController::class, 'updateRole'])->name('team.members.role');
+    Route::delete('/team/members/{user}', [TeamController::class, 'remove'])->name('team.members.remove');
 });
 
 /*

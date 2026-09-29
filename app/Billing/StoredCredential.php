@@ -19,6 +19,11 @@ final readonly class StoredCredential
         public ?string $customer = null,
         public ?string $brand = null,
         public ?string $lastFour = null,
+        // Kept so the platform can warn before the card ages out. A large
+        // slice of all churn is a card that expired, which is both the
+        // cheapest kind to prevent and the most annoying to lose.
+        public ?int $expMonth = null,
+        public ?int $expYear = null,
     ) {}
 
     public static function fromSubscription(Subscription $subscription): ?self
@@ -32,6 +37,8 @@ final readonly class StoredCredential
             customer: $subscription->gateway_customer,
             brand: $subscription->card_brand,
             lastFour: $subscription->card_last_four,
+            expMonth: $subscription->card_exp_month,
+            expYear: $subscription->card_exp_year,
         );
     }
 

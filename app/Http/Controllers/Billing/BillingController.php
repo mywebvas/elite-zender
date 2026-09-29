@@ -12,6 +12,7 @@ use App\Tenancy\TenantContext;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use RuntimeException;
 
 class BillingController extends Controller
@@ -102,7 +103,7 @@ class BillingController extends Controller
         ]);
     }
 
-    public function cancel(): RedirectResponse
+    public function cancel(Request $request): RedirectResponse
     {
         $this->authorizeBilling();
 
@@ -112,7 +113,19 @@ class BillingController extends Controller
             return back()->withErrors('There is no active subscription to cancel.');
         }
 
-        $this->billing->cancel($subscription);
+        // Captured, not demanded: the reason is a select with an "other"
+        // escape hatch, and the note is optional. Asking a leaving customer
+        // to write an essay is how you get an empty field and a bad memory.
+        $validated = $request->validate([
+            'reason' => ['nullable', 'string', Rule::in(array_keys(\App\Models\Subscription::CANCELLATION_REASONS))],
+            'feedback' => ['nullable', 'string', 'max:1000'],
+        ]);
+
+        $this->billing->cancel(
+            $subscription,
+            $validated['reason'] ?? null,
+            $validated['feedback'] ?? null,
+        );
 
         // Deliberately not immediate: the customer has paid through the end of
         // the period and taking that away is theft, however small.

@@ -53,6 +53,14 @@ class TenantController extends Controller
             'plans' => Plan::active()->orderBy('sort_order')->get(),
             'invoices' => \App\Models\Invoice::withoutGlobalScopes()
                 ->where('tenant_id', $tenant->id)->latest()->limit(20)->get(),
+            // "Did they get the warning?" is the first question support asks
+            // about any billing complaint, and before this the honest answer
+            // was "check the mail provider's logs, if they still exist".
+            'lifecycleMessages' => \App\Models\LifecycleMessage::withoutGlobalScopes()
+                ->where('tenant_id', $tenant->id)
+                ->latest('sent_at')
+                ->limit(15)
+                ->get(),
             'counts' => [
                 'contacts' => Contact::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNull('deleted_at')->count(),
                 'campaigns' => Campaign::withoutGlobalScopes()->where('tenant_id', $tenant->id)->whereNull('deleted_at')->count(),

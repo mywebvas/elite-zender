@@ -38,46 +38,59 @@ class ImportContactsJob implements ShouldQueue
         $this->onQueue('low');
     }
 
-    public static function cacheKey(string $importId): string
+    /**
+     * Status key for one import.
+     *
+     * The tenant is part of the key, not an assumption. The previous key was
+     * `contact-import:{uuid}` and the polling endpoint authorised only
+     * "may you view contacts?", so isolation rested entirely on the cache
+     * store being prefixed per tenant — which `TenantCache` can only do for
+     * stores that implement `setPrefix()`. On the array and file stores it
+     * silently does nothing, and one workspace could read another's import
+     * result by guessing an id. Bind the two together in the key itself.
+     */
+    public static function cacheKey(string $importId, string $tenantId): string
     {
-        return "contact-import:{$importId}";
+        return "contact-import:{$tenantId}:{$importId}";
     }
 
     public function handle(ContactCsvImporter $importer): void
     {
         $tenant = Tenant::find($this->tenantId);
-        TenantContext::set($tenant);
-
         $disk = Storage::disk('local');
 
-        try {
-            $result = $importer->import($disk->path($this->storedPath), $this->tenantId, $this->listId);
+        // `run()`, never `set()`/`set(null)`: the manual pair clears the
+        // context instead of restoring it, so a job dispatched inside a
+        // request (or run on the sync driver) unbinds the caller's tenant.
+        TenantContext::run($tenant, function () use ($importer, $disk): void {
+            try {
+                $result = $importer->import($disk->path($this->storedPath), $this->tenantId, $this->listId);
 
-            Cache::put(self::cacheKey($this->importId), [
-                'state' => 'completed',
-            ] + $result, now()->addHour());
-        } catch (Throwable $e) {
-            Log::error('Contact CSV import failed', [
-                'import_id' => $this->importId,
-                'tenant_id' => $this->tenantId,
-                'user_id' => $this->userId,
-                'error' => $e->getMessage(),
-            ]);
+                Cache::put(self::cacheKey($this->importId, $this->tenantId), [
+                    'state' => 'completed',
+                ] + $result, now()->addHour());
+            } catch (Throwable $e) {
+                Log::error('Contact CSV import failed', [
+                    'import_id' => $this->importId,
+                    'tenant_id' => $this->tenantId,
+                    'user_id' => $this->userId,
+                    'error' => $e->getMessage(),
+                ]);
 
-            Cache::put(self::cacheKey($this->importId), [
-                'state' => 'failed',
-                'message' => $e->getMessage(),
-            ], now()->addHour());
+                Cache::put(self::cacheKey($this->importId, $this->tenantId), [
+                    'state' => 'failed',
+                    'message' => $e->getMessage(),
+                ], now()->addHour());
 
-            // A malformed file is a permanent, user-caused failure: surface it
-            // in the status payload and stop. Only unexpected faults are
-            // rethrown so the queue can retry / record them.
-            if (! $e instanceof RuntimeException) {
-                throw $e;
+                // A malformed file is a permanent, user-caused failure: surface
+                // it in the status payload and stop. Only unexpected faults are
+                // rethrown so the queue can retry / record them.
+                if (! $e instanceof RuntimeException) {
+                    throw $e;
+                }
+            } finally {
+                $disk->delete($this->storedPath);
             }
-        } finally {
-            $disk->delete($this->storedPath);
-            TenantContext::set(null);
-        }
+        });
     }
 }

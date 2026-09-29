@@ -58,3 +58,55 @@ arch('the frozen legacy reference is never executed')
 arch('strict PHP baseline')
     ->expect('App')
     ->not->toUse(['eval', 'extract', 'compact_unsafe', 'serialize', 'unserialize']);
+
+/*
+|--------------------------------------------------------------------------
+| Source-level guards
+|--------------------------------------------------------------------------
+| Rules the arch plugin cannot express, checked against the source text.
+*/
+
+/**
+ * `TenantContext::set()` is a footgun outside the tenancy layer itself.
+ *
+ * The pair `set($tenant) … set(null)` does not restore the previous tenant,
+ * it clears it. Under Octane the container survives the request, and inside a
+ * sync-driver job the caller's tenant is simply unbound half-way through its
+ * own work. `TenantContext::run()` restores in a `finally` and is the only
+ * approved entry point. (AGENTS.md — "rules that exist because they were
+ * broken before".)
+ */
+it('never binds the tenant context manually outside the tenancy layer', function (): void {
+    $offenders = [];
+
+    $files = new RecursiveIteratorIterator(
+        new RecursiveDirectoryIterator(dirname(__DIR__, 2).'/app', RecursiveDirectoryIterator::SKIP_DOTS),
+    );
+
+    foreach ($files as $file) {
+        if ($file->getExtension() !== 'php') {
+            continue;
+        }
+
+        $path = str_replace(dirname(__DIR__, 2).'/', '', $file->getPathname());
+
+        if (str_starts_with($path, 'app/Tenancy/')) {
+            continue; // the implementation itself
+        }
+
+        foreach (file($file->getPathname()) as $number => $line) {
+            // Ignore prose: several classes document the old mistake.
+            $code = trim($line);
+
+            if ($code === '' || str_starts_with($code, '*') || str_starts_with($code, '//')) {
+                continue;
+            }
+
+            if (str_contains($code, 'TenantContext::set(')) {
+                $offenders[] = $path.':'.($number + 1);
+            }
+        }
+    }
+
+    expect($offenders)->toBe([], 'Use TenantContext::run() instead: '.implode(', ', $offenders));
+});

@@ -25,6 +25,60 @@
         </a>
     </div>
 
+    {{--
+        Activation card.
+
+        A brand-new workspace has nothing to report, so a grid of zeroes is
+        worse than useless — it says "this product does nothing". Until the
+        first campaign has gone out, the dashboard leads with the next
+        concrete step instead. Every tick is real workspace state, not a
+        stored flag (App\Services\ActivationChecklist).
+    --}}
+    @if(! $activation['complete'])
+        <section class="card mb-8 overflow-hidden">
+            <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2.5">
+                        <h3 class="text-base font-bold text-slate-900 dark:text-white">Finish setting up</h3>
+                        <span class="rounded-full bg-brand-50 px-2 py-0.5 text-xs font-bold tabular-nums text-brand-700 dark:bg-brand-500/10 dark:text-brand-400">
+                            {{ $activation['completed'] }}/{{ $activation['total'] }}
+                        </span>
+                    </div>
+
+                    @if($activation['next'])
+                        <p class="mt-1.5 text-sm text-slate-600 dark:text-slate-300">
+                            Next: <span class="font-semibold text-slate-900 dark:text-white">{{ $activation['next']['label'] }}</span>
+                        </p>
+                        <p class="mt-0.5 text-sm text-slate-500 dark:text-slate-400">{{ $activation['next']['help'] }}</p>
+                    @endif
+                </div>
+
+                <div class="flex flex-shrink-0 flex-wrap items-center gap-2">
+                    @if($activation['next'])
+                        <a href="{{ $activation['next']['url'] }}"
+                           class="inline-flex items-center gap-1.5 rounded-xl bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700">
+                            {{ $activation['next']['cta'] }}
+                            <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
+                            </svg>
+                        </a>
+                    @endif
+                    <a href="{{ route('onboarding') }}"
+                       class="inline-flex items-center rounded-xl px-3 py-2.5 text-sm font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 dark:text-slate-300 dark:ring-white/10 dark:hover:bg-white/[0.06]">
+                        All steps
+                    </a>
+                </div>
+            </div>
+
+            <div class="h-1.5 bg-slate-100 dark:bg-white/[0.06]" role="progressbar"
+                 aria-valuenow="{{ $activation['percent'] }}" aria-valuemin="0" aria-valuemax="100"
+                 aria-label="Setup progress">
+                <div class="h-full bg-brand-600 transition-all duration-500 dark:bg-brand-500"
+                     style="width: {{ $activation['percent'] }}%"></div>
+            </div>
+        </section>
+    @endif
+
     {{-- KPI stats. Copy is written for a human reading it at 8am, not for a
          dashboard screenshot: every figure says what it is and what it is of. --}}
     @php

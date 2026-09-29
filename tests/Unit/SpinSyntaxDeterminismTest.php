@@ -30,12 +30,13 @@ it('produces different variants for different seeds across a population', functi
 it('does not re-expand merge tag values', function (): void {
     $service = new SpinSyntaxService;
 
-    // A hostile first name must not inject another merge tag: the injected
-    // placeholder is neither expanded nor left visible to the recipient.
+    // A hostile first name must not inject another merge tag. Substitution is
+    // a single pass, so the injected placeholder is never resolved — it is
+    // simply printed, which is the truthful rendering of that contact's name.
     $result = $service->compile('Hi [Name]', ['Name' => '[Secret]', 'Secret' => 'leaked'], 1);
 
     expect($result)->not->toContain('leaked')
-        ->and(trim($result))->toBe('Hi');
+        ->and(trim($result))->toBe('Hi [Secret]');
 });
 
 it('handles option text containing regex metacharacters', function (): void {
@@ -46,8 +47,19 @@ it('handles option text containing regex metacharacters', function (): void {
         ->toBeIn(['$100 off', '50% off']);
 });
 
-it('strips unresolved merge tags', function (): void {
+it('resolves known tags and leaves the author bracketed copy alone', function (): void {
     $service = new SpinSyntaxService;
 
-    expect(trim($service->compile('Hello [Name] [Missing]', ['Name' => 'Ada'])))->toBe('Hello Ada');
+    // Deleting every unresolved `[word]` ate real copy: "[URGENT]",
+    // "[Webinar]" and "[New]" are ordinary subject-line furniture, and they
+    // disappeared silently between the composer and the inbox.
+    expect($service->compile('Hello [Name]', ['Name' => 'Ada']))->toBe('Hello Ada')
+        ->and($service->compile('[URGENT] Renew today, [name]', ['Name' => 'Ada']))->toBe('[URGENT] Renew today, Ada')
+        ->and($service->compile('Hello [Missing]', ['Name' => 'Ada']))->toBe('Hello [Missing]');
+});
+
+it('matches merge tags regardless of case', function (): void {
+    $service = new SpinSyntaxService;
+
+    expect($service->compile('[NAME] / [name] / [Name]', ['Name' => 'Ada']))->toBe('Ada / Ada / Ada');
 });

@@ -65,11 +65,33 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ env.PHP_VERSION }}
+          coverage: none
+          tools: composer:v2
+
+      # resources/css/app.css declares Laravel's pagination Blade view as a
+      # Tailwind @source, and that file only exists under vendor/. Building
+      # without it produced a stylesheet missing the pagination classes —
+      # silently, because Tailwind does not warn about an unresolvable
+      # @source. Same reason the Dockerfile's assets stage copies it in.
+      - name: Install PHP dependencies (Tailwind scans vendor Blade views)
+        run: composer install --prefer-dist --no-interaction --no-progress --no-scripts --no-dev
+
       - name: Install dependencies
         run: npm ci
 
       - name: Build assets
         run: npm run build
+
+      - name: Assert the stylesheet is complete
+        run: |
+          for class in rounded-l-md rounded-r-md; do
+            grep -qr "$class" public/build/assets/*.css \
+              || { echo "::error::Tailwind output is missing .$class — check the @source paths in resources/css/app.css"; exit 1; }
+          done
 
       # The test suite renders Blade templates that call @vite(), so the
       # manifest has to exist. CI never built it before, which is why
@@ -211,3 +233,23 @@ jobs:
       - name: npm audit
         run: npm audit --audit-level=high
         continue-on-error: true
+
+  # Railway deploys this Dockerfile. If it stops building, the first anyone
+  # finds out is a failed production deploy — so build it here instead.
+  image:
+    name: Production image builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Build (no push)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          load: false
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

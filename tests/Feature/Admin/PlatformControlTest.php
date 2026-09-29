@@ -570,3 +570,50 @@ it('shows recent operator activity on the console home page', function (): void 
         ->assertSee('Recent operator activity')
         ->assertSee('Suspended workspace', escape: false);
 });
+
+/*
+|--------------------------------------------------------------------------
+| System health
+|--------------------------------------------------------------------------
+*/
+
+/**
+ * `routes/console.php` is registered through `afterResolving(ConsoleKernel)`,
+ * and a web request never resolves the console kernel. The health page
+ * therefore reported "Nothing scheduled" on a platform whose SMTP quota
+ * resets, bounce scans, automation ticks and billing runs are all defined in
+ * that file — the one screen an operator checks to confirm cron is alive,
+ * quietly asserting that nothing was.
+ */
+it('lists the real schedule on the system health page', function (): void {
+    $scheduled = app(App\Platform\HealthCheck::class)->scheduledCommands();
+
+    $commands = array_column($scheduled, 'command');
+
+    expect($scheduled)->not->toBeEmpty()
+        ->and($commands)->toContain('elitesender:run-automations')
+        ->and($commands)->toContain('elitesender:billing-cycle')
+        // The php binary and the artisan path must be stripped, not left as
+        // empty quotes and a bare directory.
+        ->and($commands)->each->not->toContain('artisan');
+
+    $this->actingAs($this->admin, 'admin')
+        ->get('/admin/system')
+        ->assertOk()
+        ->assertSee('elitesender:finalise-campaigns');
+});
+
+it('reports every health probe without throwing when a dependency is down', function (): void {
+    $report = app(App\Platform\HealthCheck::class)->run();
+
+    expect(array_column($report, 'name'))->toBe([
+        'Database', 'Cache', 'Storage', 'Queue worker', 'Failed jobs', 'Stuck campaigns', 'Paused automations',
+    ]);
+
+    // The scheduler has never run in a test process, so that probe must fail
+    // loudly rather than take the page down with it.
+    $heartbeat = collect($report)->firstWhere('name', 'Queue worker');
+
+    expect($heartbeat['status'])->toBe('fail')
+        ->and($heartbeat['detail'])->toContain('heartbeat');
+});

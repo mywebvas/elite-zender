@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Tenancy\Auditable;
 use App\Tenancy\HasUuid7;
 use Database\Factories\UserFactory;
+use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -28,7 +29,7 @@ use Laravel\Sanctum\HasApiTokens;
  */
 #[Fillable(['tenant_id', 'name', 'email', 'password', 'role'])]
 #[Hidden(['password', 'remember_token', 'two_factor_secret', 'two_factor_recovery_codes'])]
-class User extends Authenticatable implements PasskeyUser
+class User extends Authenticatable implements MustVerifyEmail, PasskeyUser
 {
     /** @use HasFactory<UserFactory> */
     use Auditable, HasApiTokens, HasFactory, HasUuid7, Notifiable, PasskeyAuthenticatable, TwoFactorAuthenticatable;

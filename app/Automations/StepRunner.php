@@ -9,6 +9,7 @@ use App\Models\Contact;
 use App\Models\ContactAutomation;
 use App\Models\SuppressionEntry;
 use App\Models\Tag;
+use App\Services\CampaignTracking;
 use App\Services\EmailHtmlRenderer;
 use App\Services\SmtpPool;
 use App\Services\SpinSyntaxService;
@@ -32,6 +33,7 @@ final class StepRunner
     public function __construct(
         private readonly SpinSyntaxService $spintax,
         private readonly EmailHtmlRenderer $renderer,
+        private readonly CampaignTracking $tracking,
     ) {}
 
     public function run(AutomationStep $step, ContactAutomation $enrolment): StepOutcome
@@ -102,6 +104,21 @@ final class StepRunner
             return StepOutcome::continue();
         }
 
+        // The broadcast path refuses to send past the plan's monthly
+        // allowance; an automation that ignored it was a hole straight
+        // through the meter. Stop the journey rather than pausing it — the
+        // allowance resets, and a paused enrolment needs manual rescue.
+        $tenant = $contact->tenant_id === null ? null : \App\Models\Tenant::find($contact->tenant_id);
+
+        if ($tenant !== null && ! app(\App\Billing\PlanGate::class)->canSend($tenant)) {
+            Log::info('Automation email skipped: workspace cannot currently send', [
+                'tenant_id' => $contact->tenant_id,
+                'campaign_id' => $campaign->getKey(),
+            ]);
+
+            return StepOutcome::continue();
+        }
+
         $pool = $campaign->smtpAccounts->isNotEmpty()
             ? new SmtpPool($campaign->smtpAccounts)
             : new SmtpPool(\App\Models\SmtpAccount::withoutGlobalScopes()
@@ -115,15 +132,29 @@ final class StepRunner
             throw new RuntimeException('No SMTP relay with remaining quota is available.');
         }
 
-        $data = MergeTags::sampleData($contact);
+        // Real recipient data only. `MergeTags::sampleData()` back-fills
+        // "Ada", "Lovelace" and "ada@example.com" for anything the contact is
+        // missing — which is right for a preview and catastrophic here: every
+        // subscriber without a first name was greeted as Ada.
+        $data = MergeTags::forContact($contact);
         $seed = crc32($campaign->getKey().'|'.$contact->getKey());
+
+        $unsubUrl = UnsubscribeLink::for($campaign, $contact);
 
         $html = $this->renderer->render(
             $this->spintax->compile((string) ($campaign->editor_html ?: $campaign->body_html), $data, $seed),
             $this->spintax->compile((string) $campaign->preheader, $data, $seed),
         );
 
-        $unsubUrl = UnsubscribeLink::for($campaign, $contact);
+        // An automated message is still a bulk commercial message: CAN-SPAM
+        // and GDPR both want a visible opt-out in the body, not only the
+        // List-Unsubscribe header that a webmail client may or may not render.
+        $html = UnsubscribeLink::appendFooter($html, $unsubUrl);
+
+        // Same open pixel and click relay as a broadcast, so automation
+        // performance is measurable instead of invisible.
+        $html = $this->tracking->inject($html, (string) $campaign->getKey(), (string) $contact->getKey());
+
         $mailerKey = 'smtp_auto_'.$relay->getKey();
 
         config(["mail.mailers.{$mailerKey}" => [

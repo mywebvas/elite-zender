@@ -43,7 +43,8 @@ final class Settings
             // ── Platform ────────────────────────────────────────────────────
             'platform.name' => ['group' => 'platform', 'label' => 'Product name', 'help' => 'Shown in the interface and in outgoing mail.', 'type' => 'string'],
             'platform.support_email' => ['group' => 'platform', 'label' => 'Support email', 'help' => 'Where customers are told to write when something goes wrong.', 'type' => 'string'],
-            'platform.signups_open' => ['group' => 'platform', 'label' => 'Allow new signups', 'help' => 'Turn off to close public registration without taking the site down.', 'type' => 'bool'],
+            'platform.signups_open' => ['group' => 'platform', 'label' => 'Allow new signups', 'help' => 'Turn off to close public registration without taking the site down. Existing customers are unaffected.', 'type' => 'bool'],
+            'platform.lifecycle.enabled' => ['group' => 'platform', 'label' => 'Send lifecycle emails', 'help' => 'Trial, renewal, payment and usage notices. Turn off only while testing — customers stop being warned before they are charged or suspended.', 'type' => 'bool'],
 
             // ── Billing ─────────────────────────────────────────────────────
             'billing.trial_days' => ['group' => 'billing', 'label' => 'Trial length (days)', 'help' => 'Applies to workspaces created from now on.', 'type' => 'int'],

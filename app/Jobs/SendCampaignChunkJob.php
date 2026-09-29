@@ -63,7 +63,25 @@ class SendCampaignChunkJob implements ShouldQueue
             ->whereIn('id', $this->contactIds)
             ->get();
 
+        // Anyone who dropped out of `mailable()` between fan-out and now is
+        // still part of `recipients_count`. Recording them as skipped is what
+        // lets the campaign ever reach `completed`.
+        $vanished = count($this->contactIds) - $contacts->count();
+
         if ($contacts->isEmpty()) {
+            $this->recordProgress(0, 0, $vanished);
+
+            return;
+        }
+
+        $allowance = $this->monthlyAllowance();
+
+        if ($allowance !== null && $allowance <= 0) {
+            // The plan's monthly allowance is spent. Stop the campaign rather
+            // than quietly delivering (and billing) past what was sold.
+            $this->pause('monthly sending allowance exhausted');
+            $this->recordProgress(0, 0, $vanished);
+
             return;
         }
 
@@ -75,7 +93,8 @@ class SendCampaignChunkJob implements ShouldQueue
                 'tenant' => TenantContext::id(),
             ]);
 
-            $this->campaign->update(['status' => Campaign::STATUS_PAUSED]);
+            $this->pause('no SMTP relay with remaining quota');
+            $this->recordProgress(0, 0, $vanished);
 
             return;
         }
@@ -83,6 +102,10 @@ class SendCampaignChunkJob implements ShouldQueue
         $registered = [];
         $sent = 0;
         $failed = 0;
+        $skipped = $vanished;
+
+        /** @var list<string> $deferred contacts this chunk could not attempt */
+        $deferred = [];
 
         try {
             foreach ($contacts as $contact) {
@@ -91,17 +114,28 @@ class SendCampaignChunkJob implements ShouldQueue
                 // the contact's own status, so a re-import cannot resurrect a
                 // burnt address.
                 if (SuppressionEntry::suppresses($contact->email, (string) $this->campaign->tenant_id)) {
+                    $skipped++;
+
                     continue;
+                }
+
+                if ($allowance !== null && $sent >= $allowance) {
+                    // Everything past the allowance stays unsent and unbilled.
+                    $this->pause('monthly sending allowance exhausted');
+
+                    break;
                 }
 
                 $smtp = $pool->next();
 
                 if ($smtp === null) {
-                    // Daily caps reached mid-chunk — requeue the remainder for
-                    // later rather than silently dropping recipients.
-                    $this->release(3600);
+                    // Daily relay caps reached mid-chunk. Hand the *remainder*
+                    // to a fresh job rather than releasing this one: releasing
+                    // replays the whole chunk, and everyone already delivered
+                    // receives the campaign a second time.
+                    $deferred[] = (string) $contact->getKey();
 
-                    return;
+                    continue;
                 }
 
                 $mailerKey = $this->registerMailer($smtp, $registered);
@@ -111,20 +145,81 @@ class SendCampaignChunkJob implements ShouldQueue
         } finally {
             $pool->commitUsage();
             $this->forgetMailers($registered);
-            $this->recordProgress($sent, $failed);
+            $this->recordProgress($sent, $failed, $skipped);
         }
+
+        // Deliberately outside the `finally`: if the chunk threw, the queue
+        // will retry this job, and queueing the leftovers as well would fan a
+        // failure out into two overlapping jobs.
+        $this->deferRemainder($deferred);
+    }
+
+    /**
+     * Messages the workspace may still send this month, or null when the plan
+     * is unlimited.
+     */
+    private function monthlyAllowance(): ?int
+    {
+        $tenant = $this->campaign->tenant;
+
+        if ($tenant === null) {
+            return null;
+        }
+
+        return app(\App\Billing\PlanGate::class)->remaining($tenant, 'emails_per_month');
+    }
+
+    /**
+     * Re-queue the recipients this chunk could not attempt.
+     *
+     * A brand-new job carrying only the leftovers: no already-delivered
+     * contact is ever in it, so a relay running out of quota mid-chunk costs
+     * a delay, not a duplicate send.
+     *
+     * @param  list<string>  $contactIds
+     */
+    private function deferRemainder(array $contactIds): void
+    {
+        if ($contactIds === []) {
+            return;
+        }
+
+        Log::info('SendCampaignChunkJob: deferring recipients until relay quota resets', [
+            'campaign' => $this->campaign->getKey(),
+            'deferred' => count($contactIds),
+        ]);
+
+        self::dispatch($this->campaign, $contactIds)->delay(now()->addHour());
+    }
+
+    private function pause(string $reason): void
+    {
+        Log::warning('SendCampaignChunkJob: campaign paused', [
+            'campaign' => $this->campaign->getKey(),
+            'tenant' => (string) $this->campaign->tenant_id,
+            'reason' => $reason,
+        ]);
+
+        Campaign::withoutGlobalScopes()
+            ->whereKey($this->campaign->getKey())
+            ->where('status', Campaign::STATUS_SENDING)
+            ->update(['status' => Campaign::STATUS_PAUSED]);
     }
 
     /** Atomic counter bump so concurrent chunk workers cannot lose updates. */
-    private function recordProgress(int $sent, int $failed): void
+    private function recordProgress(int $sent, int $failed, int $skipped = 0): void
     {
-        if ($sent === 0 && $failed === 0) {
+        if ($sent === 0 && $failed === 0 && $skipped === 0) {
             return;
         }
 
         Campaign::withoutGlobalScopes()
             ->whereKey($this->campaign->getKey())
-            ->incrementEach(['sent_count' => $sent, 'failed_count' => $failed]);
+            ->incrementEach([
+                'sent_count' => $sent,
+                'failed_count' => $failed,
+                'skipped_count' => $skipped,
+            ]);
 
         // Billable usage counts messages actually handed to a relay, never the
         // size of the list.
@@ -137,9 +232,7 @@ class SendCampaignChunkJob implements ShouldQueue
         SmtpAccount $smtp,
         string $mailerKey,
     ): bool {
-        $data = $contact->only(['email', 'first_name', 'last_name']) + ($contact->custom_fields ?? []);
-        $data['Name'] = $contact->first_name ?? '';
-        $data['Email'] = $contact->email;
+        $data = \App\Support\MergeTags::forContact($contact);
 
         // Seed per recipient so the same contact always receives the same
         // variant (docs/08) — re-sends and previews stay consistent, and A/B
@@ -150,15 +243,13 @@ class SendCampaignChunkJob implements ShouldQueue
         $htmlBody = $spintax->compile($this->campaign->body_html ?? '', $data, $seed);
         $textBody = $spintax->compile($this->campaign->body_text ?? '', $data, $seed);
 
-        $htmlBody = $this->injectTracking($htmlBody, (string) $this->campaign->getKey(), (string) $contact->getKey());
+        $htmlBody = app(\App\Services\CampaignTracking::class)
+            ->inject($htmlBody, (string) $this->campaign->getKey(), (string) $contact->getKey());
 
         $unsubUrl = UnsubscribeLink::for($this->campaign, $contact);
 
-        $htmlBody = $this->appendHtml($htmlBody, $this->unsubscribeFooter($unsubUrl));
-
-        if ($textBody !== '') {
-            $textBody .= "\n\n---\nTo unsubscribe, visit: {$unsubUrl}";
-        }
+        $htmlBody = UnsubscribeLink::appendFooter($htmlBody, $unsubUrl);
+        $textBody = UnsubscribeLink::appendTextFooter($textBody, $unsubUrl);
 
         try {
             $mailable = (new CampaignEmail($subject, $htmlBody, $textBody, $unsubUrl))
@@ -222,21 +313,21 @@ class SendCampaignChunkJob implements ShouldQueue
     /** @param array<string, string> $registered */
     private function forgetMailers(array $registered): void
     {
+        if ($registered === []) {
+            return;
+        }
+
         $mailers = config('mail.mailers', []);
 
         foreach (array_keys($registered) as $key) {
             unset($mailers[$key]);
-            Mail::forgetMailers();
         }
 
         config(['mail.mailers' => $mailers]);
-    }
 
-    private function unsubscribeFooter(string $unsubUrl): string
-    {
-        return '<div style="margin-top: 40px; padding-top: 20px; border-top: 1px solid #e2e8f0; font-size: 12px; color: #64748b; text-align: center;">'
-            .'<p>You are receiving this because you opted in. '
-            .'<a href="'.e($unsubUrl).'" style="color: #64748b; text-decoration: underline;">Unsubscribe here</a>.</p></div>';
+        // Once, after the config is clean — resolved mailers are cached by key
+        // and would otherwise keep the credentials alive in memory.
+        Mail::forgetMailers();
     }
 
     /**
@@ -252,55 +343,5 @@ class SendCampaignChunkJob implements ShouldQueue
         ]);
 
         $this->campaign->update(['status' => Campaign::STATUS_PAUSED]);
-    }
-
-    /** Injects tracking pixel and rewrites links in campaign HTML. */
-    protected function injectTracking(string $html, string $campaignId, string $contactId): string
-    {
-        if (trim($html) === '') {
-            return $html;
-        }
-
-        $html = (string) preg_replace_callback(
-            '/<a\s+(?:[^>]*?\s+)?href=(["\'])(.*?)\1/i',
-            function (array $matches) use ($campaignId, $contactId): string {
-                $quote = $matches[1];
-                $originalUrl = $matches[2];
-
-                // Preserve mailto:, tel:, anchors and merge tags untouched.
-                if (str_starts_with($originalUrl, 'mailto:')
-                    || str_starts_with($originalUrl, 'tel:')
-                    || str_starts_with($originalUrl, '#')) {
-                    return $matches[0];
-                }
-
-                $trackingUrl = route('tracking.click', [
-                    'campaign' => $campaignId,
-                    'contact' => $contactId,
-                    'url' => base64_encode($originalUrl),
-                ]);
-
-                return str_replace(
-                    "href={$quote}{$originalUrl}{$quote}",
-                    "href={$quote}{$trackingUrl}{$quote}",
-                    $matches[0],
-                );
-            },
-            $html,
-        );
-
-        $pixelUrl = route('tracking.open', ['campaign' => $campaignId, 'contact' => $contactId]);
-
-        return $this->appendHtml($html, '<img src="'.$pixelUrl.'" width="1" height="1" alt="" style="display:none;" />');
-    }
-
-    /** Insert a fragment just before </body>, or append when there is no body. */
-    private function appendHtml(string $html, string $fragment): string
-    {
-        if (stripos($html, '</body>') !== false) {
-            return str_ireplace('</body>', $fragment."\n</body>", $html);
-        }
-
-        return $html."\n".$fragment;
     }
 }

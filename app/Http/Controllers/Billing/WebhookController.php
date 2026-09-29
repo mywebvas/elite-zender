@@ -9,6 +9,7 @@ use App\Models\Payment;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 
 /**
  * Gateway webhooks.
@@ -61,9 +62,18 @@ class WebhookController extends Controller
             return response()->json(['message' => 'Unknown invoice.']);
         }
 
-        // recordPayment() is idempotent on (gateway, gateway_ref), which the
-        // database enforces — a replayed webhook credits nothing twice.
-        $this->billing->recordPayment($invoice, $result);
+        try {
+            // recordPayment() is idempotent on (gateway, gateway_ref), which
+            // the database enforces — a replayed webhook credits nothing twice.
+            $this->billing->recordPayment($invoice, $result);
+        } catch (RuntimeException $e) {
+            // A payment the ledger refuses will be refused on every retry, so
+            // answer 422 rather than 500: providers back off on a 4xx and
+            // hammer a 5xx for hours.
+            report($e);
+
+            return response()->json(['message' => 'Payment could not be applied to this invoice.'], 422);
+        }
 
         return response()->json(['message' => 'Recorded.']);
     }

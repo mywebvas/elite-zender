@@ -24,6 +24,29 @@ final class PlanGate
 {
     public const METRIC_EMAILS = 'emails_sent';
 
+    /**
+     * Per-instance subscription memo, keyed by tenant.
+     *
+     * Rendering the billing page asked for four limits and four usages, and
+     * every single one of those eight calls re-queried the subscription (with
+     * its plan eager-loaded). Every authenticated request paid for one more
+     * on top, because the tenant middleware resolves the same row to decide
+     * whether to show a banner.
+     *
+     * The container binds this class as `scoped`, so the memo lives exactly as
+     * long as one request or one queued job, and `Subscription` flushes it on
+     * every write. Nothing here is allowed to outlive a change to the row.
+     *
+     * @var array<string, Subscription|null>
+     */
+    private array $subscriptions = [];
+
+    /** Drop the memo — called whenever a subscription row is written. */
+    public function flush(): void
+    {
+        $this->subscriptions = [];
+    }
+
     /** Remaining headroom, or null when unlimited. */
     public function remaining(Tenant $tenant, string $limit): ?int
     {
@@ -111,6 +134,15 @@ final class PlanGate
      */
     public function sendBlockReason(Tenant $tenant): ?string
     {
+        // Anti-abuse before commerce. A workspace where nobody has confirmed
+        // their address is a workspace that may have been opened with someone
+        // else's — and a sending platform that lets those through is a
+        // sending platform whose IP ranges get listed. Everything else in the
+        // product stays open; only the send button waits.
+        if ($this->awaitingEmailVerification($tenant)) {
+            return 'Confirm your email address before sending. We sent you a link when you signed up — check spam, or request a new one from Settings.';
+        }
+
         $subscription = $this->subscriptionFor($tenant);
 
         if ($subscription !== null && ! $subscription->isUsable()) {
@@ -155,14 +187,51 @@ final class PlanGate
         );
     }
 
-    public function subscriptionFor(Tenant $tenant): ?Subscription
+    /**
+     * Does this workspace still have nobody with a confirmed address?
+     *
+     * A workspace with no users at all is not "unverified", it is empty — it
+     * cannot have initiated anything, and blocking it would break fixtures
+     * and system jobs for no security gain. One verified member is enough:
+     * the point is to prove a human owns an inbox, not to police every seat.
+     */
+    public function awaitingEmailVerification(Tenant $tenant): bool
     {
-        return Subscription::withoutGlobalScopes()
-            ->with('plan')
-            ->firstWhere('tenant_id', $tenant->getKey());
+        /** @var object{total: int, verified: int}|null $counts */
+        $counts = User::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->getKey())
+            ->selectRaw('count(*) as total, count(email_verified_at) as verified')
+            ->first();
+
+        return $counts !== null && (int) $counts->total > 0 && (int) $counts->verified === 0;
     }
 
-    private function planFor(Tenant $tenant): ?\App\Models\Plan
+    public function subscriptionFor(Tenant $tenant): ?Subscription
+    {
+        $key = (string) $tenant->getKey();
+
+        if (! array_key_exists($key, $this->subscriptions)) {
+            $this->subscriptions[$key] = Subscription::withoutGlobalScopes()
+                ->with('plan')
+                ->firstWhere('tenant_id', $key);
+        }
+
+        return $this->subscriptions[$key];
+    }
+
+    /**
+     * The plan code a workspace is actually on — `free` when it has no
+     * subscription, which is how an account created before billing existed is
+     * treated everywhere else.
+     */
+    public function planCodeFor(Tenant $tenant): string
+    {
+        $code = $this->planFor($tenant)?->code;
+
+        return is_string($code) && $code !== '' ? $code : 'free';
+    }
+
+    public function planFor(Tenant $tenant): ?\App\Models\Plan
     {
         $subscription = $this->subscriptionFor($tenant);
 

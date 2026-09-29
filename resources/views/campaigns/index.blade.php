@@ -29,10 +29,10 @@
 {{-- Campaign Cards --}}
 @forelse($campaigns as $campaign)
 @php
-    $sentCount = is_array($campaign->stats_cache) ? ($campaign->stats_cache['sent'] ?? 0) : 0;
-    if ($sentCount === 0) {
-        $sentCount = $campaign->list ? $campaign->list->contacts()->count() : 0;
-    }
+    // Real deliveries, not the size of the list. The previous fallback ran a
+    // COUNT against the contact list for every row on the page — 25 extra
+    // queries — and then presented the answer as "Sent".
+    $sentCount = (int) $campaign->sent_count;
     $opens = $campaign->opens_count ?? 0;
     $clicks = $campaign->clicks_count ?? 0;
     $openPct = $sentCount > 0 ? round(($opens / $sentCount) * 100, 1) : 0;

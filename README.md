@@ -9,7 +9,7 @@
   <img alt="PHP 8.4+" src="https://img.shields.io/badge/PHP-8.4%2B-777BB4?logo=php&logoColor=white">
   <img alt="Laravel 13" src="https://img.shields.io/badge/Laravel-13-FF2D20?logo=laravel&logoColor=white">
   <img alt="PostgreSQL 17" src="https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-137%20passing-3FB950">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-565%20passing-3FB950">
   <img alt="PHPStan level 6" src="https://img.shields.io/badge/PHPStan-level%206-2A6FDB">
 </p>
 
@@ -42,6 +42,11 @@ same audience so the next send is cleaner than the last.
 | Recurring billing, dunning, proration, cancel/resume | ✅ |
 | Operator console: separate guard, impersonation, plan control | ✅ |
 | Operator audit trail, settings, API keys, health, team management | ✅ |
+| Email verification as a send gate (never a login wall) | ✅ |
+| Guided activation checklist, derived from real workspace state | ✅ |
+| Lifecycle email: welcome, trial, invoice, renewal, dunning, suspension | ✅ |
+| Abandoned-checkout recovery and usage-threshold alerts | ✅ |
+| Cancellation reason capture, one-click undo, win-back check-in | ✅ |
 
 ---
 
@@ -151,8 +156,11 @@ php artisan schedule:work       # in production: a single cron entry
 ```
 
 Without the scheduler, automations never advance, subscriptions never renew,
-daily SMTP quotas never reset, campaigns never move off "Sending", and audit
-logs grow without bound.
+daily SMTP quotas never reset, campaigns never move off "Sending", audit logs
+grow without bound, and **every customer-lifecycle email stops** — no trial
+warning, no renewal notice, no dunning, no warning before suspension. Treat a
+dead scheduler as a production incident; the operator console's health page
+shows its heartbeat for exactly that reason.
 
 ---
 
@@ -169,6 +177,7 @@ gates locally:
 | Front-end build | `npm run build` |
 | PostgreSQL schema | migrate + rollback against `postgres:17` |
 | Dependency audit | `composer audit`, `npm audit` |
+| Production image | `docker build .` — the artefact Railway deploys |
 
 The PostgreSQL job is not ceremony: SQLite's loose typing will happily accept a
 `bigint → uuid` foreign key that PostgreSQL rejects outright, so the schema is

@@ -56,6 +56,25 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frame Ancestors
+    |--------------------------------------------------------------------------
+    |
+    | Origins allowed to embed the application in a frame. Empty — the default
+    | everywhere — emits `frame-ancestors 'none'` plus `X-Frame-Options: DENY`,
+    | which is the only correct answer for a product that can send mail on a
+    | customer's behalf. Set APP_FRAME_ANCESTORS only for a deliberate,
+    | reviewed embed (a hosted preview, an enterprise portal), and list exact
+    | origins: https://portal.example.com, never '*'.
+    |
+    */
+
+    'frame_ancestors' => array_values(array_filter(array_map(
+        'trim',
+        explode(',', (string) env('APP_FRAME_ANCESTORS', '')),
+    ))),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

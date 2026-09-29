@@ -32,6 +32,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
  * @property int $recipients_count
  * @property int $sent_count
  * @property int $failed_count
+ * @property int $skipped_count
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */
@@ -67,7 +68,7 @@ class Campaign extends Model
         'tenant_id', 'name', 'subject', 'preheader', 'reply_to',
         'body_html', 'editor_html', 'body_text',
         'status', 'list_id', 'scheduled_at', 'settings', 'stats_cache',
-        'recipients_count', 'sent_count', 'failed_count', 'started_at', 'completed_at',
+        'recipients_count', 'sent_count', 'failed_count', 'skipped_count', 'started_at', 'completed_at',
     ];
 
     /** @return BelongsToMany<SmtpAccount, $this> */
@@ -118,6 +119,7 @@ class Campaign extends Model
             'recipients_count' => 'integer',
             'sent_count' => 'integer',
             'failed_count' => 'integer',
+            'skipped_count' => 'integer',
             'settings' => 'array',
             'stats_cache' => 'array',
         ];

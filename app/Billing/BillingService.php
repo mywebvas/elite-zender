@@ -4,6 +4,7 @@ namespace App\Billing;
 
 use App\Billing\Gateways\PaystackGateway;
 use App\Billing\Gateways\StripeGateway;
+use App\Lifecycle\LifecycleMessenger;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Plan;
@@ -25,7 +26,27 @@ final class BillingService
 {
     public function __construct(
         private readonly PaymentGatewayManager $gateways,
+        private readonly LifecycleMessenger $messenger,
     ) {}
+
+    /**
+     * Tell the workspace what just happened to its money.
+     *
+     * Every notify() here is fire-and-forget by design: LifecycleMessenger
+     * swallows and reports its own failures, so a mail outage can never roll
+     * back a settled payment or stop a suspension from applying. Keys carry
+     * the subject id, which is what makes a replayed webhook silent.
+     *
+     * @param  callable(): \Illuminate\Notifications\Notification  $factory
+     */
+    private function notify(?Tenant $tenant, string $key, callable $factory): void
+    {
+        if ($tenant === null) {
+            return;
+        }
+
+        $this->messenger->sendOnce($tenant, $key, $factory);
+    }
 
     /**
      * The currency a workspace should be billed in.
@@ -97,7 +118,7 @@ final class BillingService
             return null;
         }
 
-        return DB::transaction(function () use ($tenant, $plan, $currency, $price): Invoice {
+        $invoice = DB::transaction(function () use ($tenant, $plan, $currency, $price): Invoice {
             $subscription = Subscription::withoutGlobalScopes()
                 ->firstWhere('tenant_id', $tenant->getKey());
 
@@ -122,6 +143,29 @@ final class BillingService
                 ]],
             ]);
         });
+
+        $this->announceInvoice($tenant, $invoice);
+
+        return $invoice;
+    }
+
+    /**
+     * An invoice nobody was told about is an invoice nobody pays.
+     *
+     * This is also the first half of abandoned-checkout recovery: the email
+     * carries a direct link back to the payment page, so a customer who was
+     * interrupted mid-checkout has a one-click route back to it rather than
+     * having to find their way through the app.
+     */
+    private function announceInvoice(?Tenant $tenant, Invoice $invoice): void
+    {
+        $tenant ??= Tenant::find($invoice->tenant_id);
+
+        $this->notify(
+            $tenant,
+            'invoice_issued:'.$invoice->getKey(),
+            fn () => new \App\Notifications\Lifecycle\InvoiceIssued($invoice->loadMissing('plan')),
+        );
     }
 
     /**
@@ -133,6 +177,27 @@ final class BillingService
      */
     public function recordPayment(Invoice $invoice, PaymentResult $result): Payment
     {
+        // Amounts are minor units with no currency attached, so ₦1,000 and
+        // $10.00 are both "1000" by the time settle() compares them against
+        // the invoice total. Refusing the mismatch is the only safe answer:
+        // silently crediting it would settle a dollar invoice with naira.
+        if (strtoupper($result->currency) !== strtoupper($invoice->currency)) {
+            Log::critical('Rejected a payment in the wrong currency', [
+                'invoice' => $invoice->number,
+                'invoice_currency' => $invoice->currency,
+                'payment_currency' => $result->currency,
+                'gateway' => $result->gateway,
+                'gateway_ref' => $result->gatewayRef,
+            ]);
+
+            throw new RuntimeException(sprintf(
+                'Payment currency [%s] does not match invoice %s [%s].',
+                $result->currency,
+                $invoice->number,
+                $invoice->currency,
+            ));
+        }
+
         return DB::transaction(function () use ($invoice, $result): Payment {
             $existing = Payment::withoutGlobalScopes()
                 ->where('gateway', $result->gateway)
@@ -167,11 +232,56 @@ final class BillingService
             // first purchase, and there is nothing to attach a card to before
             // it exists. Getting this backwards meant the very first renewal
             // failed for every new customer.
+            $wasSuspended = Subscription::withoutGlobalScopes()
+                ->where('tenant_id', $invoice->tenant_id)
+                ->where('status', Subscription::STATUS_EXPIRED)
+                ->exists();
+
             $this->settle($invoice);
             $this->rememberCredential($invoice, $result);
 
+            $this->acknowledgePayment($invoice->refresh(), $payment, $wasSuspended);
+
             return $payment;
         });
+    }
+
+    /**
+     * Receipt, and — where it applies — the all-clear.
+     *
+     * Somebody who has just paid to end an outage wants one fact confirmed:
+     * that it is over. Making them log in to find out is how a recovered
+     * account becomes a cancelled one.
+     */
+    private function acknowledgePayment(Invoice $invoice, Payment $payment, bool $wasSuspended): void
+    {
+        $tenant = Tenant::find($invoice->tenant_id);
+
+        if ($tenant === null) {
+            return;
+        }
+
+        $this->notify(
+            $tenant,
+            'payment_received:'.$payment->getKey(),
+            fn () => new \App\Notifications\Lifecycle\PaymentReceived($invoice->loadMissing('plan'), $payment),
+        );
+
+        if (! $wasSuspended || ! $invoice->isPaid()) {
+            return;
+        }
+
+        $subscription = Subscription::withoutGlobalScopes()
+            ->with('plan')
+            ->firstWhere('tenant_id', $tenant->getKey());
+
+        if ($subscription !== null) {
+            $this->notify(
+                $tenant,
+                'reinstated:'.$payment->getKey(),
+                fn () => new \App\Notifications\Lifecycle\WorkspaceReinstated($subscription),
+            );
+        }
     }
 
     /** Apply the ledger to the invoice and activate the plan once covered. */
@@ -232,13 +342,22 @@ final class BillingService
      * Cancel at period end rather than immediately — the customer has paid for
      * the rest of the month and taking it away is theft, however small.
      */
-    public function cancel(Subscription $subscription): Subscription
+    public function cancel(Subscription $subscription, ?string $reason = null, ?string $feedback = null): Subscription
     {
         $subscription->forceFill([
             'cancel_at' => $subscription->current_period_end ?? now(),
             'canceled_at' => now(),
             'pending_plan_id' => null,
+            // Churn you cannot attribute is churn you cannot fix.
+            'cancellation_reason' => $reason,
+            'cancellation_feedback' => $feedback,
         ])->save();
+
+        $this->notify(
+            Tenant::find($subscription->tenant_id),
+            'cancelled:'.($subscription->cancel_at?->toDateString() ?? now()->toDateString()),
+            fn () => new \App\Notifications\Lifecycle\SubscriptionCancelled($subscription->loadMissing('plan')),
+        );
 
         return $subscription;
     }
@@ -310,7 +429,7 @@ final class BillingService
             return null;
         }
 
-        return DB::transaction(fn (): Invoice => Invoice::withoutGlobalScopes()->create([
+        $invoice = DB::transaction(fn (): Invoice => Invoice::withoutGlobalScopes()->create([
             'tenant_id' => $tenant->getKey(),
             'subscription_id' => $subscription->getKey(),
             'plan_id' => $target->getKey(),
@@ -335,6 +454,10 @@ final class BillingService
                 'amount' => $amount,
             ]],
         ]));
+
+        $this->announceInvoice($tenant, $invoice);
+
+        return $invoice;
     }
 
     /**
@@ -386,7 +509,7 @@ final class BillingService
             return null;
         }
 
-        return DB::transaction(function () use ($subscription, $plan, $price): Invoice {
+        $invoice = DB::transaction(function () use ($subscription, $plan, $price): Invoice {
             return Invoice::withoutGlobalScopes()->create([
                 'tenant_id' => $subscription->tenant_id,
                 'subscription_id' => $subscription->getKey(),
@@ -409,6 +532,10 @@ final class BillingService
                 ]],
             ]);
         });
+
+        $this->announceInvoice($subscription->tenant, $invoice);
+
+        return $invoice;
     }
 
     /**
@@ -489,6 +616,20 @@ final class BillingService
             'attempt' => $attempts,
             'reason' => $reason,
         ]);
+
+        // Dunning used to stop at this log line. Most failed renewals are an
+        // expired card — a thirty-second fix for the customer, but only if
+        // somebody tells them it happened.
+        $this->notify(
+            Tenant::find($subscription->tenant_id),
+            sprintf('payment_failed:%s:%d', $invoice->getKey(), $attempts),
+            fn () => new \App\Notifications\Lifecycle\PaymentFailed(
+                $subscription->refresh(),
+                $invoice,
+                $attempts,
+                $reason,
+            ),
+        );
     }
 
     /** Move the subscription into its next period. */
@@ -528,6 +669,12 @@ final class BillingService
         Log::warning('Subscription lapsed after the grace window', [
             'tenant_id' => $subscription->tenant_id,
         ]);
+
+        $this->notify(
+            Tenant::find($subscription->tenant_id),
+            'suspended:'.($subscription->current_period_end?->toDateString() ?? now()->toDateString()),
+            fn () => new \App\Notifications\Lifecycle\WorkspaceSuspended,
+        );
     }
 
     /** Persist a reusable credential so the next renewal needs no interaction. */

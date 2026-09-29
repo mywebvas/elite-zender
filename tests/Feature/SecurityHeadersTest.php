@@ -51,3 +51,28 @@ it('applies security headers to API routes', function (): void {
     $response->assertHeader('X-Frame-Options', 'DENY');
     $response->assertHeader('X-Content-Type-Options', 'nosniff');
 });
+
+/**
+ * Clickjacking protection must stay on unless an operator deliberately,
+ * explicitly opts a named origin in. And `X-Powered-By` has to be removed
+ * from PHP's SAPI header, not only from the Symfony response bag — the bag
+ * never held it, so the version banner shipped on every response.
+ */
+it('denies framing by default', function (): void {
+    $this->get('/login')
+        ->assertHeader('X-Frame-Options', 'DENY')
+        ->assertHeaderMissing('X-Powered-By');
+
+    expect($this->get('/login')->headers->get('Content-Security-Policy'))
+        ->toContain("frame-ancestors 'none'");
+});
+
+it('honours an explicit frame-ancestors allow list', function (): void {
+    config(['app.frame_ancestors' => ['https://portal.example.com']]);
+
+    $response = $this->get('/login');
+
+    expect($response->headers->get('Content-Security-Policy'))
+        ->toContain('frame-ancestors https://portal.example.com')
+        ->and($response->headers->get('X-Frame-Options'))->toBe('SAMEORIGIN');
+});

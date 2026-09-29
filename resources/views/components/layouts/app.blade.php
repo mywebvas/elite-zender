@@ -11,9 +11,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#4f46e5">
-    <meta name="description" content="EliteSender — Professional email campaign platform">
+    <meta name="description" content="{{ config('platform.name') }} — Professional email campaign platform">
 
-    <title>{{ isset($title) ? $title . ' · ' : '' }}EliteSender</title>
+    <title>{{ isset($title) ? $title . ' · ' : '' }}{{ config('platform.name') }}</title>
 
     {{-- PWA manifest --}}
     <link rel="manifest" href="/manifest.json">
@@ -271,9 +271,13 @@
                             <x-banner :tone="$billingNotice['tone']">
                                 {{ $billingNotice['message'] }}
                                 <x-slot:actions>
-                                    <a href="{{ route('billing.index') }}"
+                                    {{-- The notice names its own destination: a
+                                         "finish payment" banner that lands on a
+                                         generic billing page loses half the
+                                         people who click it. --}}
+                                    <a href="{{ $billingNotice['action']['url'] ?? route('billing.index') }}"
                                        class="inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-semibold shadow-sm transition hover:bg-white dark:bg-white/10 dark:hover:bg-white/20">
-                                        Go to billing
+                                        {{ $billingNotice['action']['label'] ?? 'Go to billing' }}
                                         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                                     </a>
                                 </x-slot:actions>

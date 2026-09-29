@@ -27,6 +27,28 @@ final class MergeTags
     }
 
     /**
+     * Personalisation data for a *real* delivery.
+     *
+     * No sample fall-backs: a subscriber with no first name must produce an
+     * empty tag, never "Ada". Custom fields are merged underneath the core
+     * tags so a workspace cannot accidentally shadow `[Email]`.
+     *
+     * @return array<string, mixed>
+     */
+    public static function forContact(Contact $contact): array
+    {
+        $custom = is_array($contact->custom_fields) ? $contact->custom_fields : [];
+
+        return $custom + [
+            'Name' => $contact->first_name ?? '',
+            'first_name' => $contact->first_name ?? '',
+            'last_name' => $contact->last_name ?? '',
+            'Email' => $contact->email,
+            'email' => $contact->email,
+        ];
+    }
+
+    /**
      * Data used to render previews and test sends.
      *
      * Falls back to representative sample values when the workspace has no

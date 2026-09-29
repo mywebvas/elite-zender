@@ -21,6 +21,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $gateway_token
  * @property string|null $gateway_customer
  * @property int $dunning_attempts
+ * @property string|null $cancellation_reason
+ * @property \Illuminate\Support\Carbon|null $downgraded_at
  */
 class Subscription extends Model
 {
@@ -36,17 +38,54 @@ class Subscription extends Model
 
     public const STATUS_EXPIRED = 'expired';
 
+    /**
+     * Why a customer left, in their own words where they give them.
+     *
+     * A fixed vocabulary rather than free text alone: free text cannot be
+     * counted, and a churn reason you cannot count is a churn reason nobody
+     * ever acts on. The optional note sits alongside it.
+     *
+     * @var array<string, string>
+     */
+    public const CANCELLATION_REASONS = [
+        'too_expensive' => 'Too expensive for what we send',
+        'missing_feature' => 'Missing a feature we need',
+        'too_complex' => 'Harder to use than I expected',
+        'deliverability' => 'Deliverability was not good enough',
+        'switching' => 'Moving to another tool',
+        'not_sending' => 'We are not sending email right now',
+        'temporary' => 'Just pausing for a while',
+        'other' => 'Something else',
+    ];
+
     /** @var list<string> */
     protected $fillable = [
         'tenant_id', 'plan_id', 'pending_plan_id', 'status', 'currency', 'amount', 'interval',
         'trial_ends_at', 'current_period_start', 'current_period_end',
-        'cancel_at', 'canceled_at', 'gateway', 'gateway_ref',
+        'cancel_at', 'canceled_at', 'cancellation_reason', 'cancellation_feedback',
+        'downgraded_at', 'gateway', 'gateway_ref',
         'gateway_customer', 'gateway_token', 'card_brand', 'card_last_four',
         'dunning_attempts', 'next_retry_at',
     ];
 
     /** Bearer credentials against the customer's card — never serialise them. */
     protected $hidden = ['gateway_token', 'gateway_customer'];
+
+    /**
+     * Keep the request-scoped plan memo honest.
+     *
+     * `PlanGate` caches the resolved subscription for the life of a request or
+     * a queued job. Anything that writes this row — an upgrade, a settled
+     * invoice, a lapse — has to invalidate that memo, or the rest of the
+     * request keeps enforcing the plan the customer just left.
+     */
+    protected static function booted(): void
+    {
+        $flush = static fn () => app(\App\Billing\PlanGate::class)->flush();
+
+        static::saved($flush);
+        static::deleted($flush);
+    }
 
     /** @return BelongsTo<Plan, $this> */
     public function plan(): BelongsTo
@@ -62,6 +101,23 @@ class Subscription extends Model
     public function pendingPlan(): BelongsTo
     {
         return $this->belongsTo(Plan::class, 'pending_plan_id');
+    }
+
+    /**
+     * The plan's display name, or a fallback.
+     *
+     * `plan_id` is nullable and a plan can be archived out from under a
+     * subscription, so every caller needs the same defensive read — and
+     * having it in one place stops half of them forgetting.
+     */
+    public function planName(string $fallback = 'current'): string
+    {
+        $plan = $this->plan;
+
+        // An explicit type check rather than `?->name ?? $fallback`: the
+        // relation is `mixed` to a Larastan-less analyser, and this states
+        // the actual contract — a Plan, or nothing.
+        return $plan instanceof Plan ? (string) $plan->name : $fallback;
     }
 
     /** Can this subscription renew itself without the customer returning? */
@@ -136,6 +192,7 @@ class Subscription extends Model
             'current_period_end' => 'datetime',
             'cancel_at' => 'datetime',
             'canceled_at' => 'datetime',
+            'downgraded_at' => 'datetime',
             'next_retry_at' => 'datetime',
             'dunning_attempts' => 'integer',
             // Encrypted at rest: a leaked database row must not be a means of

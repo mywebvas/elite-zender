@@ -48,7 +48,12 @@
     </div>
 
     @php
-        $sentCount = $campaign->stats_cache['sent'] ?? ($campaign->list ? $campaign->list->contacts()->count() : 0);
+        // `sent_count` is the number of messages actually handed to a relay.
+        // This used to read a `stats_cache` key that nothing has ever written,
+        // and fell back to counting the list — so an untouched draft reported
+        // a five-figure "Total Sent", and every open rate was divided by the
+        // size of the audience instead of the number of deliveries.
+        $sentCount = (int) $campaign->sent_count;
         $opens = $campaign->opens_count ?? 0;
         $clicks = $campaign->clicks_count ?? 0;
         $openPct = $sentCount > 0 ? round(($opens / $sentCount) * 100, 1) : 0;
@@ -60,6 +65,13 @@
         <div class="card p-5">
             <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Total Sent</p>
             <p class="text-3xl font-black text-slate-900 dark:text-white tracking-tight">{{ number_format($sentCount) }}</p>
+            @if($campaign->recipients_count > 0)
+                <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                    of {{ number_format($campaign->recipients_count) }} recipients
+                    @if($campaign->failed_count > 0) · {{ number_format($campaign->failed_count) }} failed @endif
+                    @if($campaign->skipped_count > 0) · {{ number_format($campaign->skipped_count) }} skipped @endif
+                </p>
+            @endif
         </div>
         <div class="card p-5">
             <p class="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">Opens</p>

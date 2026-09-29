@@ -67,6 +67,17 @@ class Invoice extends Model
         return $this->hasMany(Payment::class);
     }
 
+    /** The plan's display name, or a fallback. See Subscription::planName(). */
+    public function planName(string $fallback = 'your plan'): string
+    {
+        $plan = $this->plan;
+
+        // An explicit type check rather than `?->name ?? $fallback`: the
+        // relation is `mixed` to a Larastan-less analyser, and this states
+        // the actual contract — a Plan, or nothing.
+        return $plan instanceof Plan ? (string) $plan->name : $fallback;
+    }
+
     public function isPaid(): bool
     {
         return $this->status === self::STATUS_PAID;

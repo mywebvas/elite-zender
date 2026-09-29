@@ -6,6 +6,64 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added — the customer lifecycle
+
+Before this the product could take money but could not talk to anyone. Outside
+password reset, the only email it had ever sent was a customer's own campaign.
+
+- **Transactional email foundation.** A branded, table-based, dark-mode-aware
+  email shell with an automatically derived plain-text alternative (a missing
+  `text/plain` part is a textbook spam signal, and hand-written ones rot).
+  Content is data, not twelve near-identical Blade files, so the whole set
+  cannot drift apart.
+- **Thirteen lifecycle messages**, half event-driven from `BillingService`
+  (invoice issued, payment received, payment failed, suspended, reinstated,
+  cancelled, welcome) and half time-driven from the new
+  `elitesender:lifecycle` command (trial ending, abandoned checkout, invoice
+  due, renewal reminder, suspension warning, usage thresholds, win-back).
+- **Exactly-once delivery.** Every message is claimed by a unique insert into
+  `lifecycle_messages` before it is sent, so concurrent schedulers, an hourly
+  cadence and an accidental re-run all produce one email. Operators can see
+  what a workspace was told, and when, on the tenant page.
+- **Abandoned-checkout recovery.** An invoice raised and left unpaid is
+  chased twice — once at day 1 with a direct link back to the payment page,
+  once at day 3 — and never again.
+- **Advance notice of every charge.** Recurring debits are announced three
+  days out, which is what card-network rules expect and the cheapest
+  chargeback prevention available.
+- **Usage alerts at 80% and 100%** of the monthly allowance, so a customer
+  finds out before recipients stop receiving mail rather than after.
+- **Cancellation reason capture** with a fixed vocabulary plus an optional
+  note, a "compare plans instead" save step, one-click undo, and a single
+  win-back check-in a week after the drop to free.
+- **Email verification, as a send gate rather than a login wall.** The whole
+  product stays open to an unverified owner; only the send button waits. For
+  a platform that sends on a customer's behalf, an unverified account is how
+  IP ranges get blocklisted.
+- **`elitesender:lifecycle`**, scheduled hourly with a `--dry-run` that
+  reports without claiming anything.
+
+### Fixed — activation and operator controls
+
+- **The first-run wizard was a mock.** `testSmtp()` waited one second and
+  toasted "SMTP Connected Successfully"; `importContacts()` waited 1.5s and
+  toasted "Contacts imported". Neither issued a single request — no relay was
+  created, no contact imported, nothing persisted. A new customer was
+  congratulated three times and landed on an empty dashboard unable to send.
+  Replaced with a checklist whose every tick is derived from real workspace
+  state, surfaced on both the onboarding page and the dashboard.
+- **"Allow new signups" did nothing.** The operator console wrote the setting
+  to the database and registration stayed open however it was set — the kind
+  of control an operator reaches for mid-incident.
+- **`platform.name` and `platform.support_email` had nothing to override.**
+  There was no `config/platform.php`, so both resolved to null wherever they
+  were read.
+- **A suspended workspace got a bare 403** with no reason, no contact and no
+  indication that the data still existed. It now gets a page that says so.
+- **The billing banner always pointed at the same generic page.** It now
+  links to the specific invoice that needs paying.
+
+
 ### Added — the operator console becomes a real control plane
 
 - **Audit trail.** Every destructive operator action is written to

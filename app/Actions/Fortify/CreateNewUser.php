@@ -34,7 +34,7 @@ class CreateNewUser implements CreatesNewUsers
             'password' => $this->passwordRules(),
         ])->validate();
 
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($input) {
+        $user = \Illuminate\Support\Facades\DB::transaction(function () use ($input) {
             $workspaceName = explode(' ', $input['name'])[0]."'s Workspace";
             $tenant = \App\Models\Tenant::create([
                 'name' => $workspaceName,
@@ -56,5 +56,38 @@ class CreateNewUser implements CreatesNewUsers
 
             return $user;
         });
+
+        // Deliberately after the commit. A welcome email queued inside the
+        // transaction is a welcome email sent for a workspace that may not
+        // exist a millisecond later — and on the sync driver it would send
+        // before the row it talks about is visible to anyone else.
+        $this->welcome($user);
+
+        return $user;
+    }
+
+    /**
+     * The single most valuable email this product sends.
+     *
+     * Week-two retention in a sending tool tracks almost entirely with
+     * whether a relay was connected on day one, so this has exactly one job:
+     * get the new owner to the setup checklist. It must never be able to
+     * break registration, hence the guard.
+     */
+    private function welcome(User $user): void
+    {
+        $tenant = $user->tenant;
+
+        if ($tenant === null) {
+            return;
+        }
+
+        app(\App\Lifecycle\LifecycleMessenger::class)->sendOnce(
+            $tenant,
+            'welcome:'.$tenant->getKey(),
+            fn () => new \App\Notifications\Lifecycle\WorkspaceWelcome(
+                app(\App\Billing\PlanGate::class)->subscriptionFor($tenant),
+            ),
+        );
     }
 }

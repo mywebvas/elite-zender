@@ -94,6 +94,10 @@ class FortifyServiceProvider extends ServiceProvider
         Fortify::resetPasswordView(fn (Request $request) => view('auth.reset-password', ['request' => $request]));
         Fortify::twoFactorChallengeView(fn () => view('auth.two-factor-challenge'));
         Fortify::confirmPasswordView(fn () => view('auth.confirm-password'));
+        // Registered explicitly for the same reason as the rest: Fortify
+        // binds a response contract per view, and an unbound one is a 500
+        // the first time a customer follows a verification link.
+        Fortify::verifyEmailView(fn () => view('auth.verify-email'));
     }
 
     /**

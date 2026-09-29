@@ -10,6 +10,7 @@ use App\Models\Role;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 class CheckoutController extends Controller
@@ -108,11 +109,25 @@ class CheckoutController extends Controller
                 ->withErrors($result->failureReason ?? 'That payment did not complete.');
         }
 
-        // The pending row has served its purpose; the authoritative record is
-        // written by recordPayment(), keyed on the gateway reference.
-        $attempt->delete();
+        try {
+            $this->billing->recordPayment($invoice, $result);
+        } catch (RuntimeException $e) {
+            // The ledger refused the payment (a currency that does not match
+            // the invoice is the only case today). Never swallow it, and
+            // never delete the pending attempt: it is the only trace left of
+            // money the customer has actually parted with.
+            report($e);
 
-        $this->billing->recordPayment($invoice, $result);
+            return redirect()->route('billing.invoices.show', $invoice->id)->withErrors(
+                'We could not apply that payment automatically. Our team has been alerted — '
+                ."quote reference {$reference} if you need to chase it.",
+            );
+        }
+
+        // The pending row has served its purpose; the authoritative record is
+        // written by recordPayment(), keyed on the gateway reference. It is
+        // removed only once that record exists.
+        $attempt->delete();
 
         return redirect()->route('billing.index')->with('success', 'Payment received — thank you.');
     }

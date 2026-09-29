@@ -164,7 +164,20 @@ return [
     'features' => [
         Features::registration(),
         Features::resetPasswords(),
-        // Features::emailVerification(),
+        /*
+         | On, deliberately, and with a light touch.
+         |
+         | This product sends email on a customer's behalf. An account opened
+         | with somebody else's address — or with no address at all — is how a
+         | sending platform gets its IP ranges listed, and how a stranger
+         | receives "welcome to your new workspace" for an account they did
+         | not create.
+         |
+         | Verification is NOT a login wall: an unverified owner can sign in,
+         | import contacts, build a campaign and explore everything. The one
+         | thing they cannot do is press send. See PlanGate::sendBlockReason().
+         */
+        Features::emailVerification(),
         Features::updateProfileInformation(),
         Features::updatePasswords(),
         Features::twoFactorAuthentication([

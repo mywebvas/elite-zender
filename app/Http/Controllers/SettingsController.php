@@ -52,6 +52,7 @@ class SettingsController extends Controller
             'settings' => array_merge($tenant->settings ?? [], array_filter([
                 'timezone' => $validated['timezone'] ?? null,
                 'reply_to' => $validated['reply_to'] ?? null,
+                'country' => isset($validated['country']) ? strtoupper((string) $validated['country']) : null,
             ], static fn ($value) => $value !== null)),
         ])->save();
 

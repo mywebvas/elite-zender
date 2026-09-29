@@ -54,6 +54,8 @@ migrate/rollback job and a dependency audit.
 | An operator setting must be read by something | "Allow new signups" was written to the database and honoured by nothing; `platform.name` had no config key to override. |
 | A security-relevant account change must notify the account | Email, password and two-factor changes were silent — the exact recipe for account takeover. An email change warns the *old* address. |
 | Never delete customer data to enforce a limit | A downgrade leaves a workspace over its ceiling. Surface it; refuse additions; never trim. |
+| A price or product name shown to a customer must come from the row an operator edits | The marketing page hardcoded a "$79 lifetime" plan that did not exist, and contradicted the schema.org offers on the same page. |
+| A field the code reads must have a field the customer can write | `settings.country` drove the billing currency and had no input anywhere, so every workspace was invoiced in a currency Paystack could not charge. |
 
 ## Layout
 

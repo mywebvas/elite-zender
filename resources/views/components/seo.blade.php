@@ -1,5 +1,5 @@
 @props([
-    'title' => 'EliteSender — Multi-Tenant Email Marketing Platform',
+    'title' => config('platform.name').' — Multi-Tenant Email Marketing Platform',
     'description' => 'Run email campaigns through your own pool of SMTP relays. Health-weighted rotation, deliverability tooling, automations and real-time analytics.',
     'image' => '/icons/icon-512.png',
     'type' => 'website',
@@ -28,7 +28,7 @@
 
 {{-- Open Graph --}}
 <meta property="og:type" content="{{ $type }}">
-<meta property="og:site_name" content="EliteSender">
+<meta property="og:site_name" content="{{ config('platform.name') }}">
 <meta property="og:title" content="{{ $title }}">
 <meta property="og:description" content="{{ $description }}">
 <meta property="og:url" content="{{ url()->current() }}">

@@ -12,12 +12,14 @@ use App\Http\Controllers\CsvImportController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DataRequestController;
 use App\Http\Controllers\InvitationController;
+use App\Http\Controllers\LegalController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\SettingsController;
 use App\Http\Controllers\SmtpAccountController;
 use App\Http\Controllers\TeamController;
 use App\Http\Controllers\TrackingController;
 use App\Http\Controllers\UnsubscribeController;
+use App\Http\Controllers\WelcomeController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -28,11 +30,12 @@ use Illuminate\Support\Facades\Route;
 
 // Marketing landing page. Signed-in users go straight to their workspace so
 // the "logged in but staring at a signup CTA" dead end never happens.
-Route::get('/', function () {
-    return auth()->check()
-        ? redirect()->route('dashboard')
-        : view('welcome');
-})->name('welcome');
+Route::get('/', WelcomeController::class)->name('welcome');
+
+// Linked from the registration form and the footer, where they were
+// `href="#"`. Terms nobody can read are terms nobody agreed to.
+Route::get('/terms', [LegalController::class, 'terms'])->name('legal.terms');
+Route::get('/privacy', [LegalController::class, 'privacy'])->name('legal.privacy');
 
 // Offline fallback — served by the service worker when the network is down.
 Route::view('/offline', 'offline')->name('offline');

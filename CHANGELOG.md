@@ -6,6 +6,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — operator edits now reach the public site, and Paystack works
+
+- **The marketing page hardcoded its own pricing.** Not a stale copy of the
+  catalogue — a different product: a "$79 lifetime" tier and a "$29/yr Pro"
+  tier that existed nowhere, could not be bought, and contradicted the
+  schema.org offers a few lines above them on the same page. A visitor
+  clicking "Secure Lifetime Access — $79" landed on a billing page selling
+  monthly subscriptions at entirely different prices. Pricing, plan limits
+  and the structured data now render from the `plans` table — the same rows
+  the operator console edits — so a price change is live on the homepage,
+  in search results and at checkout the moment it is saved.
+- **Paystack payments could not complete.** `settings.country` was read by
+  `BillingService::currencyFor()` and written by nothing: there was no field
+  for it anywhere, so every workspace on earth was invoiced in USD. A
+  Nigerian Paystack account is NGN-only unless USD is explicitly enabled, so
+  `/transaction/initialize` answered "Currency not supported by merchant"
+  and the customer was stuck. There is now a billing-country selector, the
+  currency falls back to one a configured rail can actually collect, the
+  operator can declare which currencies their merchant account accepts, and
+  a currency refusal produces a message that says who needs to do what.
+- **"Product name" was honoured in nine places and ignored in nine others.**
+  Every layout, the SEO tags and the legal pages now read it.
+- **Terms of Service and Privacy Policy were `href="#"`** on the signup form
+  and a "coming soon" toast in the footer. Terms nobody can read are terms
+  nobody agreed to, and a missing privacy notice is a GDPR Article 13 failure
+  on its own. Both are now real pages describing how this product actually
+  handles data.
+- **Workspace settings pre-filled the signed-in user's name** as the
+  workspace name, so opening settings and pressing save renamed the
+  workspace to the person. The timezone dropdown had no `@selected`, so it
+  always read UTC and saving reset it.
+- A blank list-type platform setting is now left alone rather than erased,
+  matching how blank secrets already behaved.
+
+
 ### Added — account security, life above the plan ceiling, and leaving
 
 - **Security alerts.** Changing the account email, changing the password,

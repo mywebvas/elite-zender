@@ -51,22 +51,60 @@
                             <form method="POST" action="{{ route('settings.update') }}" x-data="{ saving: false }" @submit="saving = true">
                                 @csrf
                             <div>
-                                <label class="input-label">Workspace Name</label>
-                                <input type="text" name="workspace_name" value="{{ auth()->user()->name ?? 'Default Workspace' }}" class="input">
+                                <label for="workspace_name" class="input-label">Workspace name</label>
+                                {{-- This was pre-filled with `auth()->user()->name` — the person's
+                                     name, not the workspace's — so opening settings and pressing
+                                     save silently renamed the workspace to the user. --}}
+                                <input id="workspace_name" type="text" name="workspace_name"
+                                       value="{{ old('workspace_name', $tenant?->name) }}" class="input">
+                                @error('workspace_name')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                             </div>
                             <div>
-                                <label class="input-label">Timezone</label>
-                                <select name="timezone" class="input">
-                                    <option value="UTC">UTC (Coordinated Universal Time)</option>
-                                    <option value="America/New_York">America/New_York</option>
-                                    <option value="America/Chicago">America/Chicago</option>
-                                    <option value="America/Denver">America/Denver</option>
-                                    <option value="America/Los_Angeles">America/Los_Angeles</option>
-                                    <option value="Europe/London">Europe/London</option>
-                                    <option value="Europe/Paris">Europe/Paris</option>
-                                    <option value="Africa/Lagos">Africa/Lagos</option>
-                                    <option value="Asia/Dubai">Asia/Dubai</option>
+                                <label for="timezone" class="input-label">Timezone</label>
+                                {{-- No @selected before this, so the dropdown always read "UTC"
+                                     whatever was stored, and saving reset it. --}}
+                                <select id="timezone" name="timezone" class="input">
+                                    @foreach([
+                                        'UTC' => 'UTC (Coordinated Universal Time)',
+                                        'Africa/Lagos' => 'Africa/Lagos',
+                                        'Africa/Accra' => 'Africa/Accra',
+                                        'Africa/Nairobi' => 'Africa/Nairobi',
+                                        'Africa/Johannesburg' => 'Africa/Johannesburg',
+                                        'Europe/London' => 'Europe/London',
+                                        'Europe/Paris' => 'Europe/Paris',
+                                        'America/New_York' => 'America/New_York',
+                                        'America/Chicago' => 'America/Chicago',
+                                        'America/Denver' => 'America/Denver',
+                                        'America/Los_Angeles' => 'America/Los_Angeles',
+                                        'Asia/Dubai' => 'Asia/Dubai',
+                                        'Asia/Kolkata' => 'Asia/Kolkata',
+                                        'Australia/Sydney' => 'Australia/Sydney',
+                                    ] as $tz => $label)
+                                        <option value="{{ $tz }}" @selected(old('timezone', $tenant?->timezone()) === $tz)>{{ $label }}</option>
+                                    @endforeach
                                 </select>
+                                <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Used for scheduling and daily relay quota resets.</p>
+                            </div>
+                            <div>
+                                <label for="country" class="input-label">Billing country</label>
+                                {{-- Drives the invoice currency. This field was read by
+                                     BillingService::currencyFor() and written by nothing, so every
+                                     workspace was invoiced in USD — which a Nigerian Paystack
+                                     account cannot charge, and customers simply could not pay. --}}
+                                <select id="country" name="country" class="input">
+                                    <option value="">Choose your country…</option>
+                                    @foreach(App\Support\Countries::all() as $code => $name)
+                                        <option value="{{ $code }}" @selected(old('country', $tenant?->setting('country')) === $code)>{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                    Determines the currency you are invoiced in.
+                                    @php $billingCurrency = $tenant ? app(App\Billing\BillingService::class)->currencyFor($tenant) : null; @endphp
+                                    @if($billingCurrency)
+                                        You are currently billed in <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $billingCurrency }}</span>.
+                                    @endif
+                                </p>
+                                @error('country')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                             </div>
                             <div class="flex justify-end pt-4">
                                 <x-button type="submit" variant="primary" x-bind:disabled="saving">

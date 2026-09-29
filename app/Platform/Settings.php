@@ -55,11 +55,13 @@ final class Settings
             // ── Paystack ────────────────────────────────────────────────────
             'billing.gateways.paystack.public_key' => ['group' => 'paystack', 'label' => 'Public key', 'help' => 'Safe to expose; used by the inline checkout.', 'type' => 'string'],
             'billing.gateways.paystack.secret_key' => ['group' => 'paystack', 'label' => 'Secret key', 'help' => 'Also signs incoming webhooks. Rotating it here takes effect immediately.', 'type' => 'secret'],
+            'billing.gateways.paystack.currencies' => ['group' => 'paystack', 'label' => 'Currencies this account can charge', 'help' => 'Comma-separated, e.g. NGN. Most Nigerian accounts are NGN-only until USD is explicitly enabled — listing a currency the account cannot take produces invoices customers are unable to pay.', 'type' => 'list'],
 
             // ── Stripe ──────────────────────────────────────────────────────
             'billing.gateways.stripe.public_key' => ['group' => 'stripe', 'label' => 'Publishable key', 'help' => 'Safe to expose.', 'type' => 'string'],
             'billing.gateways.stripe.secret_key' => ['group' => 'stripe', 'label' => 'Secret key', 'help' => 'Setting this makes Stripe available at checkout straight away.', 'type' => 'secret'],
             'billing.gateways.stripe.webhook_secret' => ['group' => 'stripe', 'label' => 'Webhook signing secret', 'help' => 'From the Stripe dashboard endpoint for POST /webhooks/billing/stripe.', 'type' => 'secret'],
+            'billing.gateways.stripe.currencies' => ['group' => 'stripe', 'label' => 'Currencies this account can charge', 'help' => 'Comma-separated, e.g. USD,EUR,GBP.', 'type' => 'list'],
 
             // ── Bank transfer ───────────────────────────────────────────────
             'billing.gateways.manual.enabled' => ['group' => 'bank', 'label' => 'Offer bank transfer', 'help' => 'Shown at checkout when account details exist for the currency.', 'type' => 'bool'],
@@ -120,6 +122,14 @@ final class Settings
                 continue;
             }
 
+            // Same for a list. The settings form posts every field it
+            // renders, so a blank currencies box would otherwise store an
+            // empty array and silently stop the gateway supporting anything
+            // at all. Clearing one is what the reset action is for.
+            if ($type === 'list' && self::parseList($value) === []) {
+                continue;
+            }
+
             Setting::updateOrCreate(
                 ['key' => $key],
                 [
@@ -172,9 +182,11 @@ final class Settings
         foreach (self::schema() as $key => $meta) {
             $value = $this->get($key);
 
-            $display[$key] = $meta['type'] === 'secret'
-                ? ['set' => filled($value), 'preview' => $this->mask((string) $value)]
-                : $value;
+            $display[$key] = match ($meta['type']) {
+                'secret' => ['set' => filled($value), 'preview' => $this->mask((string) $value)],
+                'list' => implode(', ', (array) ($value ?? [])),
+                default => $value,
+            };
         }
 
         return $display;
@@ -202,6 +214,10 @@ final class Settings
         return match ($type) {
             'bool' => $value ? '1' : '0',
             'int' => (string) (int) $value,
+            // Stored as JSON so `config()` receives a real array: a
+            // comma-separated string would silently fail every
+            // `in_array()` check that reads it.
+            'list' => json_encode(self::parseList($value)),
             'json' => json_encode($value),
             'secret' => Crypt::encryptString((string) $value),
             default => $value === null ? null : (string) $value,
@@ -218,6 +234,7 @@ final class Settings
             return match ($type) {
                 'bool' => $raw === '1',
                 'int' => (int) $raw,
+                'list' => is_array($decoded = json_decode($raw, true)) ? $decoded : [],
                 'json' => json_decode($raw, true),
                 'secret' => Crypt::decryptString($raw),
                 default => $raw,
@@ -227,6 +244,25 @@ final class Settings
             // back to config beats a fatal on every request.
             return null;
         }
+    }
+
+    /**
+     * Split operator input into a clean, upper-cased list.
+     *
+     * @return list<string>
+     */
+    public static function parseList(mixed $value): array
+    {
+        if (is_array($value)) {
+            $parts = $value;
+        } else {
+            $parts = explode(',', (string) $value);
+        }
+
+        return array_values(array_unique(array_filter(array_map(
+            static fn ($part) => strtoupper(trim((string) $part)),
+            $parts,
+        ), static fn (string $part) => $part !== '')));
     }
 
     private function mask(string $value): string

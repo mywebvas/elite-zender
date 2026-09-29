@@ -49,13 +49,48 @@ final class BillingService
     }
 
     /**
-     * The currency a workspace should be billed in.
+     * The currency a workspace is billed in — and that we can actually
+     * collect.
+     */
+    public function currencyFor(Tenant $tenant): string
+    {
+        $preferred = $this->preferredCurrencyFor($tenant);
+
+        // A currency no configured rail can process is an unpayable invoice.
+        // This is not hypothetical: `settings.country` was read here and
+        // written by nothing, so every workspace on earth was billed in USD
+        // — and a Nigerian Paystack account, which is NGN-only unless the
+        // merchant has USD explicitly enabled, answers `/transaction/
+        // initialize` with "Currency not supported by merchant". Customers
+        // simply could not pay.
+        if ($this->gateways->availableFor($preferred) !== []) {
+            return $preferred;
+        }
+
+        $fallback = $this->gateways->firstSupportedCurrency();
+
+        if ($fallback !== null && $fallback !== $preferred) {
+            Log::warning('No payment rail supports the preferred currency; falling back', [
+                'tenant_id' => $tenant->getKey(),
+                'preferred' => $preferred,
+                'using' => $fallback,
+            ]);
+
+            return $fallback;
+        }
+
+        return $preferred;
+    }
+
+    /**
+     * What this workspace *should* be billed in, before checking whether we
+     * can actually collect it.
      *
      * Nigerian workspaces get naira: locally issued cards frequently fail on
      * USD charges, and quoting dollars to a naira-earning business is a
      * conversion killer.
      */
-    public function currencyFor(Tenant $tenant): string
+    public function preferredCurrencyFor(Tenant $tenant): string
     {
         $country = strtoupper((string) $tenant->setting('country', ''));
 

@@ -51,6 +51,14 @@
         -->
         <env name="APP_FRAME_ANCESTORS" value="" force="true"/>
         <env name="TRUSTED_PROXIES" value="" force="true"/>
+        <!--
+            Payment endpoints are pinned so the suite asserts against the real
+            provider hostnames whatever a developer has pointed their local
+            .env at (a stub, a sandbox, a proxy). Http::fake() matches on URL,
+            so an overridden base URL silently bypasses every fake.
+        -->
+        <env name="PAYSTACK_BASE_URL" value="https://api.paystack.co" force="true"/>
+        <env name="STRIPE_BASE_URL" value="https://api.stripe.com" force="true"/>
         <!-- 4 rounds keeps the suite fast; production uses the config default. -->
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>

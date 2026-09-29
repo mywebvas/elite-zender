@@ -50,25 +50,48 @@ final class PaystackGateway implements PaymentGateway
     {
         $reference = 'ez_'.Str::lower(Str::random(24));
 
-        $response = $this->client()->post('/transaction/initialize', [
-            'email' => $this->billingEmail($invoice),
-            'amount' => $invoice->balance(),
-            'currency' => strtoupper($invoice->currency),
-            'reference' => $reference,
-            'callback_url' => $callbackUrl,
-            'metadata' => [
-                'invoice_id' => $invoice->getKey(),
-                'invoice_number' => $invoice->number,
-                'tenant_id' => $invoice->tenant_id,
-            ],
-        ]);
+        try {
+            $response = $this->client()->post('/transaction/initialize', [
+                'email' => $this->billingEmail($invoice),
+                'amount' => $invoice->balance(),
+                'currency' => strtoupper($invoice->currency),
+                'reference' => $reference,
+                'callback_url' => $callbackUrl,
+                'metadata' => [
+                    'invoice_id' => $invoice->getKey(),
+                    'invoice_number' => $invoice->number,
+                    'tenant_id' => $invoice->tenant_id,
+                ],
+            ]);
+        } catch (ConnectionException $e) {
+            // verify() and chargeStored() both handled this; checkout() did
+            // not, so a momentary network fault surfaced to the customer as
+            // a raw exception page mid-payment.
+            throw new RuntimeException('We could not reach Paystack just now. Please try again in a moment.', previous: $e);
+        }
 
         $body = $response->json();
 
         if (! $response->successful() || ($body['status'] ?? false) !== true) {
-            throw new RuntimeException(
-                'Paystack could not start this payment: '.($body['message'] ?? 'unknown error'),
-            );
+            $message = (string) ($body['message'] ?? 'unknown error');
+
+            Log::warning('Paystack refused to start a payment', [
+                'invoice' => $invoice->number,
+                'currency' => $invoice->currency,
+                'message' => $message,
+            ]);
+
+            // The commonest cause by far, and one the customer can do
+            // nothing about — so say who needs to fix it.
+            if (stripos($message, 'currency') !== false) {
+                throw new RuntimeException(sprintf(
+                    'Paystack cannot charge in %s on this account. Please choose another payment method, or contact %s so we can enable it.',
+                    strtoupper($invoice->currency),
+                    (string) config('platform.support_email'),
+                ));
+            }
+
+            throw new RuntimeException('Paystack could not start this payment: '.$message);
         }
 
         return new CheckoutSession(

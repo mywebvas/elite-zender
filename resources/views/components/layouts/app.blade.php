@@ -91,7 +91,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                         </svg>
                     </div>
-                    <span x-show="sidebarOpen" x-transition class="text-[15px] font-semibold text-white truncate">EliteSender</span>
+                    <span x-show="sidebarOpen" x-transition class="text-[15px] font-semibold text-white truncate">{{ config('platform.name') }}</span>
                 </div>
             </div>
 
@@ -386,7 +386,7 @@
                     <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                         <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
-                    <span class="text-[15px] font-bold text-white">EliteSender</span>
+                    <span class="text-[15px] font-bold text-white">{{ config('platform.name') }}</span>
                 </div>
                 <div class="mt-5 h-0 flex-1 overflow-y-auto">
                     <nav class="space-y-1 px-2">

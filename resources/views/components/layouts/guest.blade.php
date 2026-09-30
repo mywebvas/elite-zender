@@ -10,7 +10,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{{ isset($title) ? $title . ' · ' : '' }}EliteSender</title>
+    <title>{{ isset($title) ? $title . ' · ' : '' }}{{ config('platform.name') }}</title>
     <script nonce="{{ $cspNonce ?? '' }}">(function(){var t=localStorage.getItem('theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark'); document.documentElement.style.backgroundColor = '#050508';}else{document.documentElement.classList.remove('dark'); document.documentElement.style.backgroundColor = '#ffffff';}})();</script>
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
@@ -44,7 +44,7 @@
                         <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                     </svg>
                 </div>
-                <span class="text-white font-bold text-lg tracking-tight">EliteSender</span>
+                <span class="text-white font-bold text-lg tracking-tight">{{ config('platform.name') }}</span>
             </div>
 
             {{-- Center headline --}}
@@ -113,7 +113,7 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
             </div>
-            <span class="font-bold text-lg">EliteSender</span>
+            <span class="font-bold text-lg">{{ config('platform.name') }}</span>
         </div>
 
         {{-- Dark mode toggle --}}

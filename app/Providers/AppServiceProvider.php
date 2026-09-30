@@ -19,7 +19,10 @@ class AppServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        //
+        // Scoped, not singleton: the plan memo inside must die with the
+        // request (or the queued job), which is exactly what `scoped` means
+        // under Octane and inside a long-running queue worker.
+        $this->app->scoped(\App\Billing\PlanGate::class);
     }
 
     /**
@@ -34,6 +37,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        $this->registerSecurityAlerts();
         $this->applyPlatformSettings();
         $this->configureModels();
         $this->configureDates();
@@ -41,6 +45,33 @@ class AppServiceProvider extends ServiceProvider
         $this->configureUrls();
         $this->configureThrottling();
         $this->registerRateLimiters();
+    }
+
+    /**
+     * Account-security events become messages the owner can act on.
+     *
+     * Disabling two-factor is the most valuable thing an attacker can do
+     * after taking a session — it removes the control that would stop them
+     * coming back — and it happened in total silence.
+     */
+    private function registerSecurityAlerts(): void
+    {
+        $listener = \App\Listeners\SendSecurityAlerts::class;
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Laravel\Fortify\Events\TwoFactorAuthenticationConfirmed::class,
+            [$listener, 'twoFactorConfirmed'],
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Laravel\Fortify\Events\TwoFactorAuthenticationDisabled::class,
+            [$listener, 'twoFactorDisabled'],
+        );
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Laravel\Fortify\Events\RecoveryCodesGenerated::class,
+            [$listener, 'recoveryCodesGenerated'],
+        );
     }
 
     /**
@@ -149,6 +180,7 @@ class AppServiceProvider extends ServiceProvider
 
             $rpm = match ($this->planFor($tenant)) {
                 'free' => 30,
+                'starter' => 60,
                 'growth' => 180,
                 'scale' => 360,
                 'enterprise' => 1000,
@@ -181,15 +213,28 @@ class AppServiceProvider extends ServiceProvider
     }
 
     /**
-     * Billing plan for a tenant. Stored in the settings JSON until the billing
-     * module lands, and read defensively so a missing key cannot 500 the
-     * limiter for every request.
+     * Billing plan for a tenant, used to tier the API rate limit.
+     *
+     * This used to read `settings.plan` from the tenant's JSON blob — a key
+     * that nothing in the application has ever written. Every workspace
+     * therefore fell through to the `starter` default: the free tier got
+     * triple the requests it was sold, Scale customers got a sixth of theirs,
+     * and the 429 body cheerfully told them to "upgrade for higher limits"
+     * that upgrading could not deliver. The subscription is the only source
+     * of truth for what someone bought.
      */
     private function planFor(?Tenant $tenant): string
     {
-        $plan = $tenant?->setting('plan');
+        if ($tenant === null) {
+            return 'free';
+        }
 
-        return is_string($plan) && $plan !== '' ? $plan : 'starter';
+        try {
+            return app(\App\Billing\PlanGate::class)->planCodeFor($tenant);
+        } catch (Throwable) {
+            // A rate limiter must never be the reason a request 500s.
+            return 'free';
+        }
     }
 
     private function tooManyRequests(string $message): Closure

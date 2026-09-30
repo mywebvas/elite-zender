@@ -1,10 +1,12 @@
 <?php
 
 use App\Console\Commands\FinaliseCampaigns;
+use App\Console\Commands\ProcessDataRequests;
 use App\Console\Commands\PurgeAuditLogs;
 use App\Console\Commands\ResetDailySmtpQuotas;
 use App\Console\Commands\RunAutomations;
 use App\Console\Commands\RunBillingCycle;
+use App\Console\Commands\RunLifecycle;
 use App\Console\Commands\ScanBounces;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -56,6 +58,25 @@ Schedule::command(ScanBounces::class)
 // enough that a failed charge still leaves a working day for support to help.
 Schedule::command(RunBillingCycle::class)
     ->dailyAt('02:30')
+    ->withoutOverlapping()
+    ->onOneServer();
+
+// Lifecycle messages run *after* the billing cycle, hourly rather than
+// daily. Hourly is not extra volume — every send is claimed in
+// `lifecycle_messages` and can only happen once — it is latency: an
+// abandoned checkout recovered within the hour converts far better than one
+// chased tomorrow morning.
+Schedule::command(RunLifecycle::class)
+    ->hourlyAt(20)
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->runInBackground();
+
+// Erasure requests whose cooling-off window has closed, and exports that
+// have aged out. Hourly rather than daily so "deleted on the 14th" means the
+// 14th, not "some time on the 15th".
+Schedule::command(ProcessDataRequests::class)
+    ->hourlyAt(40)
     ->withoutOverlapping()
     ->onOneServer();
 

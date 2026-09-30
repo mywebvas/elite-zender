@@ -26,7 +26,27 @@ class SpinSyntaxService
         return $this->processSpintax($this->replaceShortcodes($text, $data), $seed);
     }
 
-    /** @param array<string, mixed> $data */
+    /**
+     * Substitute `[Tag]` placeholders from the supplied data.
+     *
+     * Two properties this has to hold, and the naive implementations break
+     * one or the other:
+     *
+     *  - **No re-expansion.** A contact whose first name is literally
+     *    `[Secret]` must not cause `[Secret]` to be resolved. A single
+     *    `preg_replace_callback` pass guarantees it: replacement text is
+     *    never rescanned, so injected placeholders cannot chain.
+     *
+     *  - **No silent content loss.** The previous version deleted *every*
+     *    `[word]` it could not resolve, which quietly ate `[URGENT]`,
+     *    `[Webinar]` and `[New]` out of subject lines — some of the most
+     *    common copy in email marketing — with no warning anywhere. Unknown
+     *    brackets are now left exactly as the author typed them, so a
+     *    mistyped tag is visible in the composer preview (which runs this
+     *    same code) instead of vanishing on the way to the inbox.
+     *
+     * @param  array<string, mixed>  $data
+     */
     protected function replaceShortcodes(string $text, array $data): string
     {
         $replacements = [];
@@ -36,37 +56,15 @@ class SpinSyntaxService
                 continue;
             }
 
-            $replacements['['.$key.']'] = (string) $value;
+            // Templates in the wild mix `[name]`, `[Name]` and `[NAME]`.
+            $replacements[mb_strtolower((string) $key)] = (string) $value;
         }
 
-        // Single pass: a value that itself contains "[Other]" must not be
-        // re-expanded (that is how merge-tag injection gets in).
-        $text = strtr($text, $this->caseInsensitiveVariants($replacements));
-
-        // Drop any merge tag we could not resolve rather than leaking the raw
-        // placeholder into the recipient's inbox.
-        return (string) preg_replace('/\[[a-zA-Z0-9_]+\]/', '', $text);
-    }
-
-    /**
-     * `strtr` is case-sensitive; templates in the wild mix `[name]`/`[Name]`.
-     *
-     * @param  array<string, string>  $replacements
-     * @return array<string, string>
-     */
-    private function caseInsensitiveVariants(array $replacements): array
-    {
-        $expanded = [];
-
-        foreach ($replacements as $tag => $value) {
-            $bare = trim($tag, '[]');
-
-            foreach ([$bare, strtolower($bare), strtoupper($bare), ucfirst(strtolower($bare))] as $variant) {
-                $expanded['['.$variant.']'] = $value;
-            }
-        }
-
-        return $expanded;
+        return (string) preg_replace_callback(
+            '/\[([a-zA-Z0-9_]+)\]/',
+            static fn (array $m): string => $replacements[mb_strtolower($m[1])] ?? $m[0],
+            $text,
+        );
     }
 
     protected function processSpintax(string $text, ?int $seed = null): string

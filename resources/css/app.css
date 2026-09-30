@@ -1,8 +1,16 @@
 @plugin '@tailwindcss/typography';
 @import 'tailwindcss';
 
+/* Laravel's own pagination Blade view lives in vendor/, which Tailwind's
+   automatic detection skips because it is gitignored. The Docker assets stage
+   copies exactly this path in for the same reason. */
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
-@source '../../storage/framework/views/*.php';
+
+/* NB: `storage/framework/views` was also listed here. Compiled Blade is a
+   derivative of resources/views (already scanned), so it added no classes —
+   only non-determinism: whether a class survived tree-shaking depended on
+   which pages happened to have been rendered on the build machine, and the
+   directory is empty in a container build anyway. */
 
 /* Prevents an Alpine flash of un-initialised content. */
 [x-cloak] { display: none !important; }

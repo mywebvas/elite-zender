@@ -13,24 +13,10 @@
 ###############################################################################
 
 # ---------------------------------------------------------------------------
-# Stage 1 — front-end assets
+# Stage 1 — PHP dependencies
 # ---------------------------------------------------------------------------
-FROM node:22-alpine AS assets
-
-WORKDIR /app
-
-COPY package.json package-lock.json ./
-RUN --mount=type=cache,target=/root/.npm \
-    npm ci --no-audit --no-fund
-
-COPY vite.config.js tailwind.config.js* postcss.config.js* ./
-COPY resources ./resources
-
-RUN npm run build
-
-# ---------------------------------------------------------------------------
-# Stage 2 — PHP dependencies
-# ---------------------------------------------------------------------------
+# Built before the assets stage on purpose: Tailwind has to scan Laravel's
+# own pagination Blade views, which only exist inside vendor/.
 FROM composer:2 AS vendor
 
 WORKDIR /app
@@ -47,6 +33,43 @@ RUN --mount=type=cache,target=/tmp/composer-cache \
         --no-interaction \
         --prefer-dist \
         --optimize-autoloader
+
+# ---------------------------------------------------------------------------
+# Stage 2 — front-end assets
+# ---------------------------------------------------------------------------
+FROM node:22-alpine AS assets
+
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm \
+    npm ci --no-audit --no-fund
+
+COPY vite.config.js tailwind.config.js* postcss.config.js* ./
+COPY resources ./resources
+
+# resources/css/app.css declares this path as a Tailwind @source. Without it
+# the pagination controls shipped to production had no rounded ends, no
+# borders and no spacing: the classes only exist in Laravel's own Blade view,
+# the stage could not see them, and Tailwind tree-shook them away in silence.
+COPY --from=vendor \
+    /app/vendor/laravel/framework/src/Illuminate/Pagination/resources/views \
+    ./vendor/laravel/framework/src/Illuminate/Pagination/resources/views
+
+# Set to 1 for an air-gapped build; the UI falls back to the system font
+# stack declared in resources/css/app.css.
+ARG VITE_DISABLE_REMOTE_FONTS=0
+ENV VITE_DISABLE_REMOTE_FONTS=${VITE_DISABLE_REMOTE_FONTS}
+
+RUN npm run build
+
+# Fail the build rather than ship a stylesheet with holes in it. These two
+# classes come only from the vendored pagination view, so their absence means
+# the @source above stopped resolving.
+RUN for class in rounded-l-md rounded-r-md; do \
+        grep -qr "$class" public/build/assets/*.css \
+            || { echo "Tailwind output is missing .$class — check the @source paths in resources/css/app.css"; exit 1; }; \
+    done
 
 # ---------------------------------------------------------------------------
 # Stage 3 — runtime

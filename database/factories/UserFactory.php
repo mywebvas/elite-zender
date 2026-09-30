@@ -33,6 +33,7 @@ class UserFactory extends Factory
             // attribute set as one hydrated from the database. Without them,
             // Model::preventAccessingMissingAttributes() turns any view that
             // checks two-factor state into a 500 under test only.
+            'notification_preferences' => null,
             'two_factor_secret' => null,
             'two_factor_recovery_codes' => null,
             'two_factor_confirmed_at' => null,

@@ -62,6 +62,37 @@ final class PaymentGatewayManager
         return $this->gateways;
     }
 
+    /**
+     * A currency some configured rail can actually process.
+     *
+     * Prefers whatever the operator nominated as the default gateway, so a
+     * Nigerian merchant running Paystack gets NGN rather than whichever
+     * currency happens to sort first.
+     */
+    public function firstSupportedCurrency(): ?string
+    {
+        $configured = array_filter($this->gateways, fn (PaymentGateway $g) => $g->isConfigured());
+
+        if ($configured === []) {
+            return null;
+        }
+
+        $preferredKey = (string) config('billing.gateways.default');
+        $ordered = isset($configured[$preferredKey])
+            ? [$preferredKey => $configured[$preferredKey]] + $configured
+            : $configured;
+
+        foreach ($ordered as $key => $gateway) {
+            foreach ((array) config("billing.gateways.{$key}.currencies", []) as $currency) {
+                if ($gateway->supports((string) $currency)) {
+                    return strtoupper((string) $currency);
+                }
+            }
+        }
+
+        return null;
+    }
+
     /** Preferred gateway for a currency, honouring the configured default. */
     public function defaultFor(string $currency): ?PaymentGateway
     {

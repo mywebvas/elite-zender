@@ -83,7 +83,9 @@ class CampaignController extends Controller
 
         $this->authorize('view', $campaign);
 
-        $sentCount = $campaign->stats_cache['sent'] ?? ($campaign->list?->contacts()->count() ?? 0);
+        // Deliveries, not audience size: `stats_cache` was never written by
+        // anything, so this silently reported the contact list's row count.
+        $sentCount = (int) $campaign->sent_count;
 
         return view('campaigns.show', compact('campaign', 'sentCount'));
     }
@@ -262,8 +264,10 @@ class CampaignController extends Controller
             $spintax->compile((string) $campaign->preheader, $sample),
         );
 
+        $mailerKey = $this->registerTestMailer($relay);
+
         try {
-            Mail::mailer($this->testMailer($relay))->send(
+            Mail::mailer($mailerKey)->send(
                 (new \App\Mail\CampaignEmail(
                     '[TEST] '.$spintax->compile($campaign->subject, $sample),
                     $html,
@@ -275,17 +279,23 @@ class CampaignController extends Controller
             report($e);
 
             return back()->withErrors('Test send failed: '.$e->getMessage());
+        } finally {
+            $this->forgetTestMailer($mailerKey);
         }
 
         return back()->with('success', "Test email sent to {$validated['test_email']}.");
     }
 
     /**
-     * Register a throwaway mailer for the relay and remove it again — the same
-     * discipline the send workers use, so credentials never linger in the
-     * shared config repository under Octane.
+     * Register a throwaway mailer for the relay.
+     *
+     * Always paired with {@see self::forgetTestMailer()} in a `finally`. The
+     * previous version only had the first half despite its own docblock
+     * claiming otherwise, so one test send left a customer's SMTP username and
+     * password sitting in the shared config repository — which under Octane or
+     * RoadRunner is inherited by every subsequent request on that worker.
      */
-    private function testMailer(SmtpAccount $relay): string
+    private function registerTestMailer(SmtpAccount $relay): string
     {
         $key = 'smtp_test_'.$relay->getKey();
 
@@ -300,6 +310,17 @@ class CampaignController extends Controller
         ]]);
 
         return $key;
+    }
+
+    private function forgetTestMailer(string $key): void
+    {
+        $mailers = config('mail.mailers', []);
+
+        unset($mailers[$key]);
+
+        config(['mail.mailers' => $mailers]);
+
+        Mail::forgetMailers();
     }
 
     /**

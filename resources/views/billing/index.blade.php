@@ -65,11 +65,63 @@
                         <x-button type="submit" variant="secondary">Cancel scheduled change</x-button>
                     </form>
                 @elseif($subscription && $current && ! $current->isFree())
-                    <form method="POST" action="{{ route('billing.cancel') }}"
-                          onsubmit="return confirm('Cancel at the end of this period? You keep everything until then, and you can undo it any time.')">
-                        @csrf
-                        <x-button type="submit" variant="ghost">Cancel plan</x-button>
-                    </form>
+                    {{--
+                        A bare confirm() dialog asks one question and learns
+                        nothing. This asks why — churn you cannot attribute is
+                        churn you cannot fix — and offers the two outcomes that
+                        are better than losing the customer outright: a smaller
+                        plan, or the free tier.
+                    --}}
+                    <div x-data="{ open: false }" @close-modal="open = false">
+                        <x-button type="button" variant="ghost" x-on:click="open = true">Cancel plan</x-button>
+
+                        <template x-if="open">
+                            <x-modal title="Before you go">
+                                <form method="POST" action="{{ route('billing.cancel') }}" class="space-y-5">
+                                    @csrf
+
+                                    <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">
+                                        Your plan stays fully active until
+                                        <span class="font-semibold text-slate-900 dark:text-white">{{ $subscription->current_period_end?->toFormattedDayDateString() ?? 'the end of this period' }}</span>,
+                                        then the workspace moves to Free. Nothing is deleted, and you can undo this at any point.
+                                    </p>
+
+                                    <div>
+                                        <label for="cancel-reason" class="input-label">What is pushing you to cancel?</label>
+                                        <select id="cancel-reason" name="reason" class="input" required>
+                                            <option value="" disabled selected>Choose the closest one</option>
+                                            @foreach(App\Models\Subscription::CANCELLATION_REASONS as $value => $label)
+                                                <option value="{{ $value }}">{{ $label }}</option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label for="cancel-feedback" class="input-label">Anything else? <span class="font-normal text-slate-400">(optional)</span></label>
+                                        <textarea id="cancel-feedback" name="feedback" rows="3" maxlength="1000"
+                                                  class="input" placeholder="The more specific, the more likely we fix it."></textarea>
+                                    </div>
+
+                                    <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Two alternatives, in case either helps</p>
+                                        <p class="mt-1 text-sm text-slate-600 dark:text-slate-300">
+                                            If it is cost, a smaller plan keeps your sending alive for less.
+                                            If you just need a break, the Free plan holds everything indefinitely at no charge.
+                                        </p>
+                                        <a href="#plans" x-on:click="open = false"
+                                           class="mt-2.5 inline-block text-sm font-semibold text-brand-600 underline-offset-2 hover:underline dark:text-brand-400">
+                                            Compare plans instead &rarr;
+                                        </a>
+                                    </div>
+
+                                    <div class="flex justify-end gap-2 pt-1">
+                                        <x-button type="button" variant="secondary" x-on:click="open = false">Stay on {{ $current->name }}</x-button>
+                                        <x-button type="submit" variant="ghost">Cancel my plan</x-button>
+                                    </div>
+                                </form>
+                            </x-modal>
+                        </template>
+                    </div>
                 @endif
             </div>
         </div>
@@ -134,7 +186,7 @@
     </section>
 
     {{-- ───────────────────────── Plans ───────────────────────── --}}
-    <section class="mb-8">
+    <section id="plans" class="mb-8">
         <div class="mb-5 flex flex-wrap items-baseline justify-between gap-3">
             <div>
                 <h3 class="text-base font-semibold text-slate-900 dark:text-white">Choose your plan</h3>

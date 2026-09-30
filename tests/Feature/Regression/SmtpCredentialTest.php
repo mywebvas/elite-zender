@@ -66,3 +66,33 @@ it('never exposes the password through the API', function (): void {
         ->assertDontSee('do-not-leak')
         ->assertJsonMissingPath('data.0.password');
 });
+
+/**
+ * The send workers register a throwaway mailer per relay and remove it again,
+ * because the config repository is shared for the life of an Octane worker.
+ * The composer's "send a test to myself" path registered one and never
+ * removed it, so one click left a customer's SMTP username and password in
+ * the config of every subsequent request served by that worker.
+ */
+it('leaves no relay credentials in the config after a test send', function (): void {
+    Illuminate\Support\Facades\Mail::fake();
+
+    $campaign = App\Models\Campaign::factory()->create(['tenant_id' => $this->user->tenant_id]);
+
+    SmtpAccount::factory()->create([
+        'tenant_id' => $this->user->tenant_id,
+        'status' => SmtpAccount::STATUS_ACTIVE,
+        'username' => 'postmaster@example.com',
+        'password' => 'must-not-linger',
+    ]);
+
+    $this->post(route('campaigns.test-send', $campaign), ['test_email' => 'me@example.com'])
+        ->assertRedirect();
+
+    $leaked = collect(config('mail.mailers'))
+        ->filter(fn ($mailer) => is_array($mailer) && ($mailer['password'] ?? null) === 'must-not-linger');
+
+    expect($leaked)->toBeEmpty()
+        ->and(array_keys(config('mail.mailers')))
+        ->each->not->toStartWith('smtp_test_');
+});

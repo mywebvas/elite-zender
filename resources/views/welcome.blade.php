@@ -9,23 +9,21 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
 
+    {{-- Offers come from the plan catalogue, not from a copy of it. A search
+         result quoting a price the checkout will not honour is a trust
+         problem and, in several jurisdictions, a legal one. --}}
     <x-seo
-        title="EliteSender — Own Your Email Infrastructure"
+        :title="config('platform.name').' — Own Your Email Infrastructure'"
         description="Run email campaigns through your own pool of SMTP relays. Health-weighted rotation, deliverability tooling, automations and real-time analytics."
         :schema="[
             '@context' => 'https://schema.org',
             '@type' => 'SoftwareApplication',
-            'name' => 'EliteSender',
+            'name' => config('platform.name'),
             'applicationCategory' => 'BusinessApplication',
             'operatingSystem' => 'Web',
             'description' => 'Multi-tenant email marketing platform with SMTP-pool rotation, deliverability tooling and real-time analytics.',
             'url' => url('/'),
-            'offers' => [
-                ['@type' => 'Offer', 'name' => 'Free', 'price' => '0', 'priceCurrency' => 'USD'],
-                ['@type' => 'Offer', 'name' => 'Starter', 'price' => '15', 'priceCurrency' => 'USD'],
-                ['@type' => 'Offer', 'name' => 'Growth', 'price' => '59', 'priceCurrency' => 'USD'],
-                ['@type' => 'Offer', 'name' => 'Scale', 'price' => '159', 'priceCurrency' => 'USD'],
-            ],
+            'offers' => $schemaOffers,
         ]"
     />
 
@@ -99,7 +97,7 @@
 
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a href="{{ route('register') }}" class="btn-gradient py-4 px-8 text-base font-black">
-                Secure Lifetime Access — $79
+                {{ $headlineCta }}
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
             </a>
             <a href="{{ route('register') }}" class="px-8 py-4 text-base font-semibold text-slate-300 hover:text-white border border-white/20 hover:border-white/40 rounded-xl transition-all">
@@ -107,7 +105,7 @@
             </a>
         </div>
 
-        <p class="mt-6 text-sm text-slate-600">? No credit card required &nbsp;·&nbsp; ? 14-day money-back guarantee &nbsp;·&nbsp; ? Instant access</p>
+        <p class="mt-6 text-sm text-slate-600">No credit card required &nbsp;·&nbsp; Cancel any time &nbsp;·&nbsp; Your data stays yours</p>
 
                 <div class="mt-20 relative mx-auto max-w-5xl" x-intersect="$el.classList.add('opacity-100', 'translate-y-0'); $el.classList.remove('opacity-0', 'translate-y-8')" class="transition-all duration-1000 ease-out opacity-0 translate-y-8">
             <div class="absolute -inset-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-[2rem] blur-2xl opacity-20"></div>
@@ -148,11 +146,14 @@
 {{-- --------------------------- STATS --------------------------- --}}
 <section class="py-16 border-y border-slate-200 dark:border-white/[0.05] bg-slate-50 dark:bg-[#080810]">
     <div class="max-w-5xl mx-auto px-6 grid grid-cols-2 lg:grid-cols-4 gap-8">
+        {{-- Claims a visitor can hold us to. "8 SMTP accounts supported" and
+             "$79 one-time" were both untrue: relays are limited by plan, and
+             there has never been a lifetime price. --}}
         @foreach([
-            ['100k','Emails / hour throughput'],
-            ['8',   'SMTP accounts supported'],
-            ['$79',  'One-time lifetime price'],
-            ['0',    'Monthly recurring fees'],
+            ['100k', 'Emails / hour throughput'],
+            [$plans->max(fn ($p) => $p->limit('smtp_accounts')) === null ? 'Unlimited' : number_format((int) $plans->max(fn ($p) => $p->limit('smtp_accounts'))), 'SMTP relays on the top tier'],
+            [config('billing.trial_days').'-day', 'Free trial, no card needed'],
+            ['0', 'Contracts, setup fees or lock-in'],
         ] as $s)
         <div class="text-center">
             <p class="text-4xl font-black gradient-text">{{ $s[0] }}</p>
@@ -239,7 +240,7 @@
                     <span class="w-6 h-6 rounded-full bg-rose-100 dark:bg-rose-500/15 flex items-center justify-center text-xs">?</span>
                     The Old Way (Renting)
                 </h3>
-                @foreach(['Monthly subscriptions that grow with your list','Artificial sending limits per tier','Account suspension risk — no warning','Your data stored on their platform','Escalating fees: $49 ? $99 ? $199/mo'] as $item)
+                @foreach(['Per-contact pricing that grows whether you send or not','Your sending reputation pooled with every other customer','Suspension with no warning and no export','Your list living on their platform','Opaque deliverability — no relay-level visibility'] as $item)
                 <div class="flex items-start gap-3 mb-3">
                     <span class="text-rose-400 font-bold text-sm mt-0.5">?</span>
                     <p class="text-sm text-slate-600 dark:text-slate-300">{{ $item }}</p>
@@ -251,7 +252,7 @@
                     <span class="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-500/15 flex items-center justify-center text-xs">?</span>
                     The New Way (Owning)
                 </h3>
-                @foreach(['Pay once — $79 lifetime. Done.','Send without limits — 100k/hr','Your server. Your SMTP. Your rules.','Full data sovereignty — JSON export anytime','List grows to 1M? Costs stay exactly the same.'] as $item)
+                @foreach(['Your own SMTP relays, rotated by health','Your sending reputation, not a shared pool','Suspension only for non-payment — never a surprise','One-click export of everything, whenever you want','Plans priced on sending volume, not list size'] as $item)
                 <div class="flex items-start gap-3 mb-3">
                     <span class="text-emerald-500 font-bold text-sm mt-0.5">?</span>
                     <p class="text-sm text-slate-600 dark:text-slate-300">{{ $item }}</p>
@@ -263,66 +264,125 @@
 </section>
 
 {{-- --------------------------- PRICING --------------------------- --}}
+{{--
+    Rendered from the plan catalogue (App\Services\PricingCatalogue), which
+    is the same table the operator console edits and the same one the billing
+    page reads.
+
+    What used to be here was three hardcoded cards — a "$79 lifetime" tier and
+    a "$29/yr Pro" tier — neither of which existed as a plan, could be bought,
+    or matched the structured data a few lines further up the same document. A
+    visitor who clicked "Secure Lifetime Access — $79" reached a billing page
+    offering monthly subscriptions at entirely different prices.
+--}}
 <section id="pricing" class="py-24 bg-white dark:bg-[#050508]">
-    <div class="max-w-5xl mx-auto px-6">
+    <div class="max-w-6xl mx-auto px-6">
         <div class="text-center mb-14">
-            <p class="text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-3">Simple Pricing</p>
-            <h2 class="text-4xl font-black text-slate-900 dark:text-white">Own it once. Use it forever.</h2>
+            <p class="text-xs font-bold uppercase tracking-widest text-indigo-600 dark:text-indigo-400 mb-3">Simple pricing</p>
+            <h2 class="text-4xl font-black text-slate-900 dark:text-white">Priced on what you send</h2>
+            <p class="mt-3 text-slate-500 dark:text-slate-400">Not on how big your list is. Upgrade, downgrade or leave whenever you like.</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 items-start">
-            {{-- Free --}}
-            <div class="relative rounded-3xl p-8 bg-white dark:bg-[#080810] border border-slate-200 dark:border-white/5">
-                <p class="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Free Engine</p>
-                <p class="text-4xl font-black text-slate-900 dark:text-white mb-1">$0</p>
-                <p class="text-sm text-slate-500 mb-6">Explore the platform</p>
-                <hr class="border-slate-200 dark:border-white/10 mb-6">
-                @foreach(['1 SMTP connection','Standard sending engine','Basic analytics'] as $f)
-                <div class="flex items-center gap-2 mb-3 text-sm text-slate-600 dark:text-slate-300">
-                    <svg class="w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    {{ $f }}
-                </div>
-                @endforeach
-                <a href="{{ route('register') }}" class="mt-6 block text-center py-3 px-6 rounded-xl border border-slate-200 dark:border-white/10 text-sm font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                    Start Free
-                </a>
-            </div>
+        <div class="grid gap-6 items-start sm:grid-cols-2 lg:grid-cols-{{ min(4, max(1, $plans->count())) }}">
+            @foreach($plans as $plan)
+                @php
+                    $isHeadline = $headline !== null && $plan->is($headline);
+                    $price = $plan->priceFor('USD');
+                @endphp
 
-            {{-- Lifetime MOST POPULAR --}}
-            <div class="relative rounded-2xl p-8 text-white overflow-hidden" style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)">
-                <div class="absolute top-4 right-4 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-xs font-bold">?? Most Popular</div>
-                <p class="text-sm font-bold text-indigo-200 uppercase tracking-wider mb-1">Lifetime Engine</p>
-                <p class="text-4xl font-black mb-1">$79</p>
-                <p class="text-sm text-indigo-200 mb-6">One-time payment. Forever.</p>
-                <hr class="border-white/20 mb-6">
-                @foreach(['Unlimited subscribers','Unlimited SMTP rotation','Turbo parallel delivery 100k/hr','IMAP Bounce Shield','API & Webhooks','Lifetime silent OTA updates','Full data sovereignty'] as $f)
-                <div class="flex items-center gap-2 mb-3 text-sm text-indigo-100">
-                    <svg class="w-4 h-4 text-white flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    {{ $f }}
-                </div>
-                @endforeach
-                <a href="{{ route('register') }}" class="mt-6 block text-center py-3 px-6 rounded-xl bg-white text-indigo-700 text-sm font-black hover:bg-indigo-50 transition-colors shadow-lg">
-                    Secure Lifetime Access — $79
-                </a>
-            </div>
+                <div @class([
+                    'relative rounded-3xl p-7 flex flex-col h-full',
+                    'text-white overflow-hidden shadow-xl' => $isHeadline,
+                    'bg-white dark:bg-[#080810] border border-slate-200 dark:border-white/5' => ! $isHeadline,
+                ]) @if($isHeadline) style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%)" @endif>
 
-            {{-- Pro --}}
-            <div class="relative rounded-3xl p-8 bg-white dark:bg-[#080810] border border-slate-200 dark:border-white/5">
-                <p class="text-sm font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">Pro Engine</p>
-                <p class="text-4xl font-black text-slate-900 dark:text-white mb-1">$29<span class="text-lg font-medium text-slate-400">/yr</span></p>
-                <p class="text-sm text-slate-500 mb-6">Scaled sending</p>
-                <hr class="border-slate-200 dark:border-white/10 mb-6">
-                @foreach(['Unlimited SMTP rotation','Turbo sending engine','IMAP Bounce Shield','API & Webhooks','Refer & Earn affiliate'] as $f)
-                <div class="flex items-center gap-2 mb-3 text-sm text-slate-600 dark:text-slate-300">
-                    <svg class="w-4 h-4 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
-                    {{ $f }}
+                    @if($isHeadline)
+                        <div class="absolute top-4 right-4 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-xs font-bold">Most popular</div>
+                    @endif
+
+                    <p @class([
+                        'text-sm font-bold uppercase tracking-wider mb-1',
+                        'text-indigo-200' => $isHeadline,
+                        'text-slate-500 dark:text-slate-400' => ! $isHeadline,
+                    ])>{{ $plan->name }}</p>
+
+                    <p @class(['text-4xl font-black mb-1', 'text-slate-900 dark:text-white' => ! $isHeadline])>
+                        @if($plan->isQuoteOnly())
+                            Let's talk
+                        @else
+                            <x-money :amount="$price ?? 0" currency="USD" class="!tabular-nums" />
+                            <span @class(['text-lg font-medium', 'text-indigo-200' => $isHeadline, 'text-slate-400' => ! $isHeadline])>/mo</span>
+                        @endif
+                    </p>
+
+                    <p @class(['text-sm mb-6', 'text-indigo-200' => $isHeadline, 'text-slate-500' => ! $isHeadline])>
+                        {{ $plan->description ?: 'Everything you need to start sending.' }}
+                    </p>
+
+                    <hr @class(['mb-6', 'border-white/20' => $isHeadline, 'border-slate-200 dark:border-white/10' => ! $isHeadline]) />
+
+                    {{-- Limits come from the plan row, so an operator raising a
+                         cap raises it here too. --}}
+                    <div class="space-y-3 mb-6">
+                        @foreach([
+                            'emails_per_month' => 'emails a month',
+                            'contacts' => 'contacts',
+                            'smtp_accounts' => 'SMTP relays',
+                            'users' => 'team members',
+                        ] as $key => $label)
+                            @php $limit = $plan->limit($key); @endphp
+                            <div @class([
+                                'flex items-center gap-2 text-sm',
+                                'text-indigo-100' => $isHeadline,
+                                'text-slate-600 dark:text-slate-300' => ! $isHeadline,
+                            ])>
+                                <svg @class(['w-4 h-4 flex-shrink-0', 'text-white' => $isHeadline, 'text-emerald-500' => ! $isHeadline])
+                                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                {{-- "1 SMTP relays" is the kind of detail that
+                                     makes a pricing page look unfinished. --}}
+                                <span><span class="font-semibold">{{ $limit === null ? 'Unlimited' : number_format($limit) }}</span>
+                                    {{ $limit === 1 ? \Illuminate\Support\Str::singular($label) : $label }}</span>
+                            </div>
+                        @endforeach
+
+                        @foreach((array) ($plan->features ?? []) as $feature)
+                            <div @class([
+                                'flex items-center gap-2 text-sm',
+                                'text-indigo-100' => $isHeadline,
+                                'text-slate-600 dark:text-slate-300' => ! $isHeadline,
+                            ])>
+                                <svg @class(['w-4 h-4 flex-shrink-0', 'text-white' => $isHeadline, 'text-emerald-500' => ! $isHeadline])
+                                     fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/>
+                                </svg>
+                                {{ $feature }}
+                            </div>
+                        @endforeach
+                    </div>
+
+                    <a href="{{ route('register') }}" @class([
+                        'mt-auto block text-center py-3 px-6 rounded-xl text-sm transition-colors',
+                        'bg-white text-indigo-700 font-black hover:bg-indigo-50 shadow-lg' => $isHeadline,
+                        'border border-slate-200 dark:border-white/10 font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5' => ! $isHeadline,
+                    ])>
+                        @if($plan->isQuoteOnly())
+                            Talk to us
+                        @elseif($plan->isFree())
+                            Start free
+                        @else
+                            Choose {{ $plan->name }}
+                        @endif
+                    </a>
                 </div>
-                @endforeach
-                <a href="{{ route('register') }}" class="mt-6 block text-center py-3 px-6 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-sm font-semibold hover:bg-indigo-100 dark:hover:bg-indigo-500/20 transition-colors">
-                    Get Pro Access
-                </a>
-            </div>
+            @endforeach
         </div>
+
+        <p class="mt-8 text-center text-sm text-slate-500 dark:text-slate-400">
+            Prices in USD. Nigerian workspaces are billed in naira at checkout.
+            Every plan includes a {{ config('billing.trial_days') }}-day trial — no card needed to start.
+        </p>
     </div>
 </section>
 
@@ -367,14 +427,14 @@
         <p class="text-lg text-slate-400 mb-10">Stop paying expensive subscriptions for tools you do not control. Take command of your delivery engine.</p>
         <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
             <a href="{{ route('register') }}" class="btn-gradient py-4 px-8 text-base font-black">
-                Secure Lifetime Access — $79
+                {{ $headlineCta }}
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
             </a>
             <a href="{{ route('register') }}" class="px-8 py-4 text-sm font-semibold text-slate-400 border border-white/20 rounded-xl hover:border-white/40 hover:text-white transition-all">
                 Try Free Version
             </a>
         </div>
-        <p class="mt-6 text-sm text-slate-600">14-day money-back guarantee · No credit card required</p>
+        <p class="mt-6 text-sm text-slate-600">No credit card required · Cancel any time</p>
     </div>
 </section>
 
@@ -391,8 +451,8 @@
         </div>
         <p class="text-sm text-slate-400">© {{ date('Y') }} EliteSender. All rights reserved.</p>
         <div class="flex items-center gap-4 text-sm text-slate-400">
-            <a href="#" @click.prevent="window.$toast('Privacy Policy coming soon')" class="hover:text-slate-600 dark:hover:text-slate-200">Privacy</a>
-            <a href="#" @click.prevent="window.$toast('Terms of Service coming soon')" class="hover:text-slate-600 dark:hover:text-slate-200">Terms</a>
+            <a href="{{ route('legal.privacy') }}" class="hover:text-slate-600 dark:hover:text-slate-200">Privacy</a>
+            <a href="{{ route('legal.terms') }}" class="hover:text-slate-600 dark:hover:text-slate-200">Terms</a>
         </div>
     </div>
 </footer>

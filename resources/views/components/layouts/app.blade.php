@@ -11,9 +11,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#4f46e5">
-    <meta name="description" content="EliteSender — Professional email campaign platform">
+    <meta name="description" content="{{ config('platform.name') }} — Professional email campaign platform">
 
-    <title>{{ isset($title) ? $title . ' · ' : '' }}EliteSender</title>
+    <title>{{ isset($title) ? $title . ' · ' : '' }}{{ config('platform.name') }}</title>
 
     {{-- PWA manifest --}}
     <link rel="manifest" href="/manifest.json">
@@ -91,7 +91,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                         </svg>
                     </div>
-                    <span x-show="sidebarOpen" x-transition class="text-[15px] font-semibold text-white truncate">EliteSender</span>
+                    <span x-show="sidebarOpen" x-transition class="text-[15px] font-semibold text-white truncate">{{ config('platform.name') }}</span>
                 </div>
             </div>
 
@@ -107,11 +107,15 @@
                         ['route' => 'smtp-accounts.index', 'label' => 'SMTP Pool',  'icon' => 'M5 12h14M5 12a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v4a2 2 0 01-2 2M5 12a2 2 0 00-2 2v4a2 2 0 002 2h14a2 2 0 002-2v-4a2 2 0 00-2-2'],
                         ['route' => 'bounces.index',               'label' => 'Bounces',    'icon' => 'M13 17h8m0 0V9m0 8l-8-8-4 4-6-6'],
                         ['route' => 'billing.index',   'label' => 'Billing',    'icon' => 'M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z'],
+                        // Admins and owners only: a viewer has nothing to do here
+                        // and a nav item that 403s is worse than no nav item.
+                        ['route' => 'team.index',      'label' => 'Team',       'ability' => 'viewAny', 'icon' => 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z'],
                         ['route' => 'settings.index',               'label' => 'Settings',   'icon' => 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z'],
                     ];
                 @endphp
 
                 @foreach($navItems as $item)
+                    @continue(isset($item['ability']) && auth()->user()?->cannot($item['ability'], App\Models\User::class))
                     @php $active = request()->routeIs(str_replace('#', '', $item['route']) . '*'); @endphp
                     <a
                         href="{{ $item['route'] === '#' ? '#' : route($item['route']) }}"
@@ -271,9 +275,13 @@
                             <x-banner :tone="$billingNotice['tone']">
                                 {{ $billingNotice['message'] }}
                                 <x-slot:actions>
-                                    <a href="{{ route('billing.index') }}"
+                                    {{-- The notice names its own destination: a
+                                         "finish payment" banner that lands on a
+                                         generic billing page loses half the
+                                         people who click it. --}}
+                                    <a href="{{ $billingNotice['action']['url'] ?? route('billing.index') }}"
                                        class="inline-flex items-center gap-1 rounded-lg bg-white/70 px-3 py-1.5 text-xs font-semibold shadow-sm transition hover:bg-white dark:bg-white/10 dark:hover:bg-white/20">
-                                        Go to billing
+                                        {{ $billingNotice['action']['label'] ?? 'Go to billing' }}
                                         <svg class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
                                     </a>
                                 </x-slot:actions>
@@ -378,7 +386,7 @@
                     <div class="w-8 h-8 rounded-lg bg-indigo-600 flex items-center justify-center">
                         <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
-                    <span class="text-[15px] font-bold text-white">EliteSender</span>
+                    <span class="text-[15px] font-bold text-white">{{ config('platform.name') }}</span>
                 </div>
                 <div class="mt-5 h-0 flex-1 overflow-y-auto">
                     <nav class="space-y-1 px-2">

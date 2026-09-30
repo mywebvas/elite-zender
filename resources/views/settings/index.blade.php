@@ -51,22 +51,60 @@
                             <form method="POST" action="{{ route('settings.update') }}" x-data="{ saving: false }" @submit="saving = true">
                                 @csrf
                             <div>
-                                <label class="input-label">Workspace Name</label>
-                                <input type="text" name="workspace_name" value="{{ auth()->user()->name ?? 'Default Workspace' }}" class="input">
+                                <label for="workspace_name" class="input-label">Workspace name</label>
+                                {{-- This was pre-filled with `auth()->user()->name` — the person's
+                                     name, not the workspace's — so opening settings and pressing
+                                     save silently renamed the workspace to the user. --}}
+                                <input id="workspace_name" type="text" name="workspace_name"
+                                       value="{{ old('workspace_name', $tenant?->name) }}" class="input">
+                                @error('workspace_name')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                             </div>
                             <div>
-                                <label class="input-label">Timezone</label>
-                                <select name="timezone" class="input">
-                                    <option value="UTC">UTC (Coordinated Universal Time)</option>
-                                    <option value="America/New_York">America/New_York</option>
-                                    <option value="America/Chicago">America/Chicago</option>
-                                    <option value="America/Denver">America/Denver</option>
-                                    <option value="America/Los_Angeles">America/Los_Angeles</option>
-                                    <option value="Europe/London">Europe/London</option>
-                                    <option value="Europe/Paris">Europe/Paris</option>
-                                    <option value="Africa/Lagos">Africa/Lagos</option>
-                                    <option value="Asia/Dubai">Asia/Dubai</option>
+                                <label for="timezone" class="input-label">Timezone</label>
+                                {{-- No @selected before this, so the dropdown always read "UTC"
+                                     whatever was stored, and saving reset it. --}}
+                                <select id="timezone" name="timezone" class="input">
+                                    @foreach([
+                                        'UTC' => 'UTC (Coordinated Universal Time)',
+                                        'Africa/Lagos' => 'Africa/Lagos',
+                                        'Africa/Accra' => 'Africa/Accra',
+                                        'Africa/Nairobi' => 'Africa/Nairobi',
+                                        'Africa/Johannesburg' => 'Africa/Johannesburg',
+                                        'Europe/London' => 'Europe/London',
+                                        'Europe/Paris' => 'Europe/Paris',
+                                        'America/New_York' => 'America/New_York',
+                                        'America/Chicago' => 'America/Chicago',
+                                        'America/Denver' => 'America/Denver',
+                                        'America/Los_Angeles' => 'America/Los_Angeles',
+                                        'Asia/Dubai' => 'Asia/Dubai',
+                                        'Asia/Kolkata' => 'Asia/Kolkata',
+                                        'Australia/Sydney' => 'Australia/Sydney',
+                                    ] as $tz => $label)
+                                        <option value="{{ $tz }}" @selected(old('timezone', $tenant?->timezone()) === $tz)>{{ $label }}</option>
+                                    @endforeach
                                 </select>
+                                <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">Used for scheduling and daily relay quota resets.</p>
+                            </div>
+                            <div>
+                                <label for="country" class="input-label">Billing country</label>
+                                {{-- Drives the invoice currency. This field was read by
+                                     BillingService::currencyFor() and written by nothing, so every
+                                     workspace was invoiced in USD — which a Nigerian Paystack
+                                     account cannot charge, and customers simply could not pay. --}}
+                                <select id="country" name="country" class="input">
+                                    <option value="">Choose your country…</option>
+                                    @foreach(App\Support\Countries::all() as $code => $name)
+                                        <option value="{{ $code }}" @selected(old('country', $tenant?->setting('country')) === $code)>{{ $name }}</option>
+                                    @endforeach
+                                </select>
+                                <p class="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                                    Determines the currency you are invoiced in.
+                                    @php $billingCurrency = $tenant ? app(App\Billing\BillingService::class)->currencyFor($tenant) : null; @endphp
+                                    @if($billingCurrency)
+                                        You are currently billed in <span class="font-semibold text-slate-700 dark:text-slate-200">{{ $billingCurrency }}</span>.
+                                    @endif
+                                </p>
+                                @error('country')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                             </div>
                             <div class="flex justify-end pt-4">
                                 <x-button type="submit" variant="primary" x-bind:disabled="saving">
@@ -187,27 +225,248 @@
                                 <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Configure IMAP to automatically scan your inbox for bounced emails and suppress them.</p>
                             </div>
                         </div>
-                        <div class="p-6 space-y-6">
-                            <div class="grid grid-cols-2 gap-4">
+                        {{--
+                            This form used to have no action and a button that
+                            fired `window.$toast('IMAP Settings saved
+                            successfully')`. Nothing was ever written, so
+                            `ScanBounces` skipped every workspace on every
+                            15-minute run and the entire Bounce Shield feature
+                            was unreachable — while telling the customer it had
+                            been configured.
+                        --}}
+                        <form method="POST" action="{{ route('settings.imap') }}" class="p-6 space-y-6">
+                            @csrf
+                            @method('PUT')
+
+                            @php $imap = $tenant?->setting('imap') ?? []; @endphp
+
+                            <div class="grid gap-4 sm:grid-cols-2">
                                 <div>
-                                    <label class="input-label">IMAP Host</label>
-                                    <input type="text" class="input" placeholder="imap.gmail.com">
+                                    <label for="imap_host" class="input-label">IMAP host</label>
+                                    <input id="imap_host" name="host" type="text" class="input @error('host') ring-rose-400 @enderror"
+                                           value="{{ old('host', $imap['host'] ?? '') }}" placeholder="imap.gmail.com">
+                                    @error('host')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                                 </div>
                                 <div>
-                                    <label class="input-label">IMAP Port</label>
-                                    <input type="number" class="input" placeholder="993">
+                                    <label for="imap_port" class="input-label">Port</label>
+                                    <input id="imap_port" name="port" type="number" class="input @error('port') ring-rose-400 @enderror"
+                                           value="{{ old('port', $imap['port'] ?? 993) }}" placeholder="993">
+                                    @error('port')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                                 </div>
                                 <div>
-                                    <label class="input-label">Email Address</label>
-                                    <input type="email" class="input" placeholder="bounces@yourdomain.com">
+                                    <label for="imap_username" class="input-label">Mailbox address</label>
+                                    <input id="imap_username" name="username" type="text" class="input @error('username') ring-rose-400 @enderror"
+                                           value="{{ old('username', $imap['username'] ?? '') }}" placeholder="bounces@yourdomain.com">
+                                    @error('username')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
                                 </div>
                                 <div>
-                                    <label class="input-label">Password / App Password</label>
-                                    <input type="password" class="input" placeholder="********">
+                                    <label for="imap_password" class="input-label">
+                                        Password / app password
+                                        @if(filled($imap['password'] ?? null))
+                                            <span class="font-normal text-slate-400">— leave blank to keep the current one</span>
+                                        @endif
+                                    </label>
+                                    <input id="imap_password" name="password" type="password" autocomplete="new-password"
+                                           class="input @error('password') ring-rose-400 @enderror"
+                                           placeholder="{{ filled($imap['password'] ?? null) ? '••••••••' : 'App password' }}">
+                                    @error('password')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
+                                </div>
+                                <div>
+                                    <label for="imap_encryption" class="input-label">Encryption</label>
+                                    <select id="imap_encryption" name="encryption" class="input">
+                                        <option value="ssl" @selected(old('encryption', $imap['encryption'] ?? 'ssl') === 'ssl')>SSL / TLS (993)</option>
+                                        <option value="none" @selected(old('encryption', $imap['encryption'] ?? 'ssl') === 'none')>None (143)</option>
+                                    </select>
                                 </div>
                             </div>
+
+                            <p class="text-xs text-slate-500 dark:text-slate-400">
+                                Point this at the mailbox your relays deliver bounces to. We read it every 15 minutes,
+                                classify hard bounces and complaints, and suppress those addresses automatically.
+                                The password is encrypted at rest.
+                            </p>
+
+                            <div class="flex items-center justify-end gap-3">
+                                @if(filled($imap['host'] ?? null))
+                                    <button type="submit" name="disconnect" value="1"
+                                            class="rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">
+                                        Disconnect
+                                    </button>
+                                @endif
+                                <x-button type="submit" variant="primary">Save configuration</x-button>
+                            </div>
+                        </form>
+                    </x-card>
+
+                    {{-- Email preferences --}}
+                    <x-card>
+                        <div class="border-b border-slate-200 p-6 dark:border-white/10">
+                            <h3 class="text-lg font-medium text-slate-900 dark:text-white">Email preferences</h3>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                What we send <em>you</em>. Billing and security notices are always on —
+                                they are the ones you would be furious to have missed.
+                            </p>
+                        </div>
+
+                        <form method="POST" action="{{ route('settings.notifications') }}" class="space-y-5 p-6">
+                            @csrf
+                            @method('PUT')
+
+                            @foreach(App\Models\User::OPTIONAL_NOTIFICATIONS as $key => $meta)
+                                <label class="flex cursor-pointer items-start gap-3">
+                                    <input type="checkbox" name="{{ $key }}" value="1"
+                                           @checked(auth()->user()->wantsNotification($key))
+                                           class="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500 dark:border-white/20 dark:bg-white/5">
+                                    <span>
+                                        <span class="block text-sm font-medium text-slate-900 dark:text-white">{{ $meta['label'] }}</span>
+                                        <span class="mt-0.5 block text-sm text-slate-500 dark:text-slate-400">{{ $meta['help'] }}</span>
+                                    </span>
+                                </label>
+                            @endforeach
+
+                            <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600 dark:border-white/10 dark:bg-white/[0.03] dark:text-slate-300">
+                                <span class="font-semibold text-slate-900 dark:text-white">Always on:</span>
+                                invoices and receipts, failed payments, anything before your sending is
+                                paused, and security notices such as a password change or a seat being
+                                removed.
+                            </div>
+
                             <div class="flex justify-end">
-                                <x-button @click="window.$toast('IMAP Settings saved successfully', 'success')" variant="primary">Save Configuration</x-button>
+                                <x-button type="submit" variant="primary">Save preferences</x-button>
+                            </div>
+                        </form>
+                    </x-card>
+
+                    {{-- Your data: export and erasure (GDPR Art. 15 / 17) --}}
+                    <x-card id="data">
+                        <div class="border-b border-slate-200 p-6 dark:border-white/10">
+                            <h3 class="text-lg font-medium text-slate-900 dark:text-white">Your data</h3>
+                            <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                Take a copy whenever you like, and leave whenever you like. Both are
+                                buttons, not a support ticket.
+                            </p>
+                        </div>
+
+                        <div class="space-y-6 p-6">
+                            {{-- Export --}}
+                            <div>
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div class="min-w-0">
+                                        <p class="text-sm font-semibold text-slate-900 dark:text-white">Export everything</p>
+                                        <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                            Contacts, lists, campaigns, engagement history, team and relay
+                                            configuration, as CSV in a zip. Credentials are deliberately excluded.
+                                        </p>
+                                    </div>
+                                    <form method="POST" action="{{ route('data.export') }}" class="flex-shrink-0">
+                                        @csrf
+                                        <x-button type="submit" variant="secondary">Request export</x-button>
+                                    </form>
+                                </div>
+
+                                @if($exports->isNotEmpty())
+                                    <ul class="mt-4 space-y-2">
+                                        @foreach($exports as $export)
+                                            <li class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm dark:border-white/10">
+                                                <span class="text-slate-600 dark:text-slate-300">
+                                                    {{ $export->created_at?->toFormattedDayDateString() }}
+                                                    @if($export->status === App\Models\DataRequest::STATUS_PENDING)
+                                                        · <span class="font-medium text-amber-600 dark:text-amber-400">preparing…</span>
+                                                    @elseif($export->isDownloadable())
+                                                        · {{ number_format(($export->file_size ?? 0) / 1024) }} KB
+                                                        · expires {{ $export->expires_at?->diffForHumans() }}
+                                                    @elseif($export->status === App\Models\DataRequest::STATUS_FAILED)
+                                                        · <span class="font-medium text-rose-600 dark:text-rose-400">failed</span>
+                                                    @else
+                                                        · <span class="text-slate-400">no longer available</span>
+                                                    @endif
+                                                </span>
+                                                @if($export->isDownloadable())
+                                                    <a href="{{ route('data.download', $export) }}"
+                                                       class="font-semibold text-brand-600 underline-offset-2 hover:underline dark:text-brand-400">Download</a>
+                                                @endif
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                @endif
+                            </div>
+
+                            {{-- Erasure --}}
+                            <div class="border-t border-slate-100 pt-6 dark:border-white/[0.06]">
+                                @if($pendingDeletion)
+                                    <div class="rounded-xl border border-rose-200 bg-rose-50 p-4 dark:border-rose-500/20 dark:bg-rose-500/10">
+                                        <p class="text-sm font-semibold text-rose-900 dark:text-rose-200">
+                                            This workspace is scheduled for deletion on
+                                            {{ $pendingDeletion->scheduled_for?->toFormattedDayDateString() }}.
+                                        </p>
+                                        <p class="mt-1 text-sm text-rose-800 dark:text-rose-300">
+                                            Everything is still here and still working until then. After that it is gone permanently.
+                                        </p>
+                                        <form method="POST" action="{{ route('data.delete.cancel', $pendingDeletion) }}" class="mt-3">
+                                            @csrf @method('DELETE')
+                                            <x-button type="submit" variant="primary">Cancel the deletion</x-button>
+                                        </form>
+                                    </div>
+                                @elseif(auth()->user()->isOwner())
+                                    <div x-data="{ open: false }">
+                                        <div class="flex flex-wrap items-start justify-between gap-3">
+                                            <div class="min-w-0">
+                                                <p class="text-sm font-semibold text-slate-900 dark:text-white">Delete this workspace</p>
+                                                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
+                                                    Permanent, and it takes everyone's access with it. We wait
+                                                    {{ App\Models\DataRequest::DELETION_GRACE_DAYS }} days first so you can change your mind.
+                                                </p>
+                                            </div>
+                                            <button type="button" x-on:click="open = !open"
+                                                    class="flex-shrink-0 rounded-xl px-3 py-2 text-sm font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50 dark:text-rose-400 dark:ring-rose-500/30 dark:hover:bg-rose-500/10">
+                                                Delete workspace
+                                            </button>
+                                        </div>
+
+                                        <form x-show="open" x-cloak method="POST" action="{{ route('data.delete') }}" class="mt-4 space-y-4">
+                                            @csrf
+
+                                            <p class="text-sm text-slate-600 dark:text-slate-300">
+                                                Consider exporting your data first — the deletion will wait.
+                                            </p>
+
+                                            <div>
+                                                <label for="confirmation" class="input-label">
+                                                    Type <span class="font-mono font-bold text-slate-900 dark:text-white">{{ $tenant?->name }}</span> to confirm
+                                                </label>
+                                                <input id="confirmation" name="confirmation" type="text" autocomplete="off"
+                                                       class="input @error('confirmation') ring-rose-400 @enderror">
+                                                @error('confirmation')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
+                                            </div>
+
+                                            <div>
+                                                <label for="delete-password" class="input-label">Your password</label>
+                                                <input id="delete-password" name="password" type="password" autocomplete="current-password"
+                                                       class="input @error('password') ring-rose-400 @enderror">
+                                                @error('password')<p class="mt-1.5 text-sm text-rose-600 dark:text-rose-400">{{ $message }}</p>@enderror
+                                            </div>
+
+                                            <div>
+                                                <label for="delete-reason" class="input-label">Why are you leaving? <span class="font-normal text-slate-400">(optional)</span></label>
+                                                <select id="delete-reason" name="reason" class="input">
+                                                    <option value="">Prefer not to say</option>
+                                                    @foreach(App\Models\Subscription::CANCELLATION_REASONS as $value => $label)
+                                                        <option value="{{ $value }}">{{ $label }}</option>
+                                                    @endforeach
+                                                </select>
+                                            </div>
+
+                                            <div class="flex justify-end gap-2">
+                                                <x-button type="button" variant="secondary" x-on:click="open = false">Keep my workspace</x-button>
+                                                <x-button type="submit" variant="ghost">Schedule deletion</x-button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                @else
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                                        Only the workspace owner can delete the workspace.
+                                    </p>
+                                @endif
                             </div>
                         </div>
                     </x-card>

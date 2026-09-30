@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAdmin;
+use App\Http\Middleware\EnsureRegistrationIsOpen;
 use App\Http\Middleware\ForceHttps;
 use App\Http\Middleware\NoStoreForAuthenticated;
 use App\Http\Middleware\PublicApiCors;
@@ -44,6 +45,10 @@ return Application::configure(basePath: dirname(__DIR__))
         // which meant every `auth:sanctum` API request ran with no tenant
         // bound — and therefore with the HasTenant global scope inert.
         $middleware->web(append: [
+            // Fortify owns the registration routes, so the operator's
+            // "Allow new signups" switch has to be enforced from the stack
+            // rather than bolted onto a route definition we do not control.
+            EnsureRegistrationIsOpen::class,
             ResolveTenant::class,
             ShareImpersonationBanner::class,
             NoStoreForAuthenticated::class,

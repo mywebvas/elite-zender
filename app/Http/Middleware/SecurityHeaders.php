@@ -47,6 +47,17 @@ class SecurityHeaders
         }
 
         // Strip server fingerprinting.
+        //
+        // `X-Powered-By` needs both halves: PHP emits it from the SAPI, not
+        // from the response object, so removing it from the Symfony bag left
+        // `X-Powered-By: PHP/8.4.x` on the wire regardless. `header_remove()`
+        // reaches the real one. (`expose_php=Off` in php.ini is the belt to
+        // this brace, and the shipped nginx config hides it a third time —
+        // a version banner is free reconnaissance.)
+        if (! headers_sent()) {
+            header_remove('X-Powered-By');
+        }
+
         $response->headers->remove('X-Powered-By');
         $response->headers->remove('Server');
 
@@ -59,7 +70,7 @@ class SecurityHeaders
         return [
             'Content-Security-Policy' => $this->contentSecurityPolicy($nonce),
             'Strict-Transport-Security' => 'max-age=63072000; includeSubDomains; preload',
-            'X-Frame-Options' => 'DENY',
+            'X-Frame-Options' => $this->frameAncestors() === ["'none'"] ? 'DENY' : 'SAMEORIGIN',
             'X-Content-Type-Options' => 'nosniff',
             'Referrer-Policy' => 'strict-origin-when-cross-origin',
             'Permissions-Policy' => 'accelerometer=(), camera=(), display-capture=(), geolocation=(), gyroscope=(), microphone=(), payment=(), usb=(), interest-cohort=()',
@@ -67,6 +78,28 @@ class SecurityHeaders
             'Cross-Origin-Resource-Policy' => 'same-origin',
             'X-Permitted-Cross-Domain-Policies' => 'none',
         ];
+    }
+
+    /**
+     * Who may frame this application.
+     *
+     * `'none'` by default and in every deployment that does not say
+     * otherwise — clickjacking protection is not negotiable. The escape hatch
+     * exists for the narrow, legitimate cases (a staging preview served
+     * inside a control panel, an enterprise portal embedding the dashboard),
+     * and it is an explicit, auditable list of origins rather than a switch
+     * that turns the control off.
+     *
+     * @return list<string>
+     */
+    private function frameAncestors(): array
+    {
+        /** @var list<string> $configured */
+        $configured = array_values(array_filter(
+            array_map('trim', (array) config('app.frame_ancestors', [])),
+        ));
+
+        return $configured === [] ? ["'none'"] : $configured;
     }
 
     private function contentSecurityPolicy(string $nonce): string
@@ -93,7 +126,7 @@ class SecurityHeaders
             'manifest-src' => ["'self'"],
             'base-uri' => ["'self'"],
             'form-action' => ["'self'"],
-            'frame-ancestors' => ["'none'"],
+            'frame-ancestors' => $this->frameAncestors(),
             'object-src' => ["'none'"],
         ];
 

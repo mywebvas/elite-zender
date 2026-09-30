@@ -7,7 +7,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="robots" content="noindex, nofollow">
-    <title>{{ $title ? $title . ' · ' : '' }}EliteSender</title>
+    <title>{{ $title ? $title . ' · ' : '' }}{{ config('platform.name') }}</title>
 
     {{-- Public landing pages (unsubscribe, preference centre) must render even
          if the asset bundle is unavailable, so the critical styling is inline

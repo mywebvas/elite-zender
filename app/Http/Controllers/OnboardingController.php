@@ -2,30 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Campaign;
-use App\Models\Contact;
-use App\Models\SmtpAccount;
+use App\Services\ActivationChecklist;
 use Illuminate\Contracts\View\View;
 
 /**
- * Guided first-run wizard. Each step is derived from real workspace state so
- * the checklist cannot drift out of sync with what the user has actually done.
+ * Guided first-run wizard. Every step is derived from real workspace state
+ * (see App\Services\ActivationChecklist) so the checklist cannot drift out of
+ * sync with what the user has actually done — and so the dashboard card and
+ * this page can never disagree.
  */
 class OnboardingController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(ActivationChecklist $checklist): View
     {
-        $steps = [
-            'smtp' => SmtpAccount::query()->exists(),
-            'contacts' => Contact::query()->exists(),
-            'campaign' => Campaign::query()->exists(),
-            'sent' => Campaign::query()->where('sent_count', '>', 0)->exists(),
-        ];
-
-        return view('onboarding', [
-            'steps' => $steps,
-            'completed' => count(array_filter($steps)),
-            'total' => count($steps),
-        ]);
+        return view('onboarding', $checklist->summary());
     }
 }

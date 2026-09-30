@@ -72,6 +72,37 @@
                     <p class="px-5 py-8 text-center text-sm text-slate-500">No invoices.</p>
                 @endforelse
             </div>
+
+            {{--
+                Lifecycle mail.
+
+                "Did they get the warning?" is the first question support asks
+                about any billing complaint. Without this the honest answer was
+                "check the mail provider's logs, if they still exist" — so the
+                benefit of the doubt always went to the customer and the
+                credit note was always issued.
+            --}}
+            <div class="rounded-xl border border-white/10 bg-[#0b0b14]">
+                <div class="border-b border-white/10 px-5 py-3">
+                    <h2 class="text-sm font-semibold">Lifecycle mail</h2>
+                    <p class="mt-0.5 text-xs text-slate-500">What we told them, and when.</p>
+                </div>
+                @forelse($lifecycleMessages as $message)
+                    <div class="flex items-center justify-between gap-4 border-b border-white/5 px-5 py-3 text-sm last:border-0">
+                        <div class="min-w-0">
+                            <p class="truncate font-mono text-xs text-slate-300">{{ $message->key }}</p>
+                            <p class="text-xs text-slate-500">
+                                {{ $message->recipients }} recipient{{ $message->recipients === 1 ? '' : 's' }}
+                            </p>
+                        </div>
+                        <p class="flex-shrink-0 text-right text-xs text-slate-400" title="{{ $message->sent_at->toDayDateTimeString() }}">
+                            {{ $message->sent_at->diffForHumans() }}
+                        </p>
+                    </div>
+                @empty
+                    <p class="px-5 py-8 text-center text-sm text-slate-500">Nothing sent yet.</p>
+                @endforelse
+            </div>
         </div>
 
         <div class="space-y-4">
@@ -85,6 +116,15 @@
                         {{ str_replace('_', ' ', $subscription->status) }}
                         @if($subscription->current_period_end) · renews {{ $subscription->current_period_end->toFormattedDateString() }}@endif
                     </p>
+                    @if($subscription->cancellation_reason)
+                        {{-- Churn you cannot attribute is churn you cannot fix. --}}
+                        <p class="mt-2 rounded-lg bg-amber-500/10 px-2.5 py-1.5 text-xs text-amber-300">
+                            Cancelling — {{ \App\Models\Subscription::CANCELLATION_REASONS[$subscription->cancellation_reason] ?? $subscription->cancellation_reason }}
+                            @if($subscription->cancellation_feedback)
+                                <span class="mt-1 block text-amber-200/80">&ldquo;{{ \Illuminate\Support\Str::limit($subscription->cancellation_feedback, 160) }}&rdquo;</span>
+                            @endif
+                        </p>
+                    @endif
                 @else
                     <p class="text-sm text-slate-500">No subscription.</p>
                 @endif

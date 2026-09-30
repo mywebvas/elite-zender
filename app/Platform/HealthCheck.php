@@ -132,18 +132,46 @@ final class HealthCheck
      */
     public function scheduledCommands(): array
     {
+        // `routes/console.php` is wired through `afterResolving(ConsoleKernel)`,
+        // and nothing resolves the console kernel during a web request. Read
+        // the schedule without this line and it is always empty — which is
+        // exactly what the operator console showed: "Nothing scheduled", on a
+        // platform whose daily quota resets, bounce scans and billing runs all
+        // live in that file. Bootstrapping is idempotent and safe here.
+        app(\Illuminate\Contracts\Console\Kernel::class)->bootstrap();
+
         $schedule = app(\Illuminate\Console\Scheduling\Schedule::class);
         $events = [];
 
         foreach ($schedule->events() as $event) {
             $events[] = [
-                'command' => trim(str_replace([PHP_BINARY, "'artisan'", 'artisan'], '', (string) $event->command)),
+                'command' => $this->readableCommand((string) $event->command),
                 'expression' => $event->expression,
                 'next' => $event->nextRunDate()->diffForHumans(),
             ];
         }
 
         return $events;
+    }
+
+    /**
+     * Turn a scheduled command back into something a human reads.
+     *
+     * Laravel formats these as `'<php binary>' '<path>/artisan' the:command`,
+     * with both paths shell-escaped. Stripping the literals `PHP_BINARY` and
+     * `'artisan'` left the quotes and the directory behind, so the console
+     * listed entries like `'' '/srv/app/'` — technically the command, of no
+     * use to anyone reading the page at 3am.
+     */
+    private function readableCommand(string $command): string
+    {
+        $stripped = preg_replace(
+            '/^\s*(?:\'[^\']*\'|"[^"]*"|\S+)\s+(?:\'[^\']*artisan\'|"[^"]*artisan"|\S*artisan)\s*/',
+            '',
+            $command,
+        );
+
+        return trim($stripped ?? $command);
     }
 
     /**

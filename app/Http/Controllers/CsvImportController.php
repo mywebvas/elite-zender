@@ -26,7 +26,9 @@ class CsvImportController extends Controller
 
         // Checked before the file is even stored: discovering the limit after
         // importing 400k rows helps nobody.
-        if ($reason = $planGate->denialReason(TenantContext::tenant(), 'contacts')) {
+        $tenant = TenantContext::tenant();
+
+        if ($tenant !== null && ($reason = $planGate->denialReason($tenant, 'contacts')) !== null) {
             return back()->withErrors($reason);
         }
 
@@ -66,14 +68,19 @@ class CsvImportController extends Controller
             ->with('import_id', $importId);
     }
 
-    /** Poll endpoint for the in-progress import banner. */
+    /**
+     * Poll endpoint for the in-progress import banner.
+     *
+     * The status key is namespaced by tenant, so an id belonging to another
+     * workspace resolves to "pending" and never to their row counts.
+     */
     public function show(string $importId): \Illuminate\Http\JsonResponse
     {
         $this->authorize('viewAny', Contact::class);
 
         return response()->json([
             'data' => \Illuminate\Support\Facades\Cache::get(
-                ImportContactsJob::cacheKey($importId),
+                ImportContactsJob::cacheKey($importId, (string) TenantContext::id()),
                 ['state' => 'pending'],
             ),
         ]);

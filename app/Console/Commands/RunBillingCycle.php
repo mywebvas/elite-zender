@@ -234,6 +234,10 @@ class RunBillingCycle extends Command
             'canceled_at' => null,
             'cancel_at' => null,
             'gateway_token' => null,
+            // The cancellation columns are cleared here because the
+            // subscription is no longer *ending*, it has ended. Without this
+            // marker there would be nothing left to hang a win-back on.
+            'downgraded_at' => now(),
         ])->save();
 
         Log::info('Subscription cancellation applied; workspace moved to the free plan', [

@@ -117,9 +117,15 @@ re-scoped. Nothing in the locked list above changed.
 4. **Automation branching is linear.** A `condition` step ends the journey when
    it does not match, rather than following a second branch. True A/B
    branching needs a second edge on `automation_steps`.
-5. **Dunning notifications are logged, not emailed.** The retry schedule and
-   the failure reasons are recorded; wiring them to a transactional email
-   template is a small, separate piece of work.
+5. **Campaigns paused by a worker cannot be resumed from the UI.** When a
+   relay pool or a plan allowance runs out mid-send the campaign is paused
+   and the operator is told why, but restarting it needs a new campaign:
+   re-dispatching would re-fan-out the whole list and double-send everyone
+   already delivered. A per-recipient delivery ledger (or `Bus::batch`)
+   closes this properly.
+6. **Automation `send_email` does not record a CampaignEvent for the send
+   itself**, so automation open/click rates are measured against the
+   broadcast denominator.
 
 ### Closed since the last audit
 
@@ -130,3 +136,40 @@ re-scoped. Nothing in the locked list above changed.
   at checkout and re-charge it off-session, with a 1/3/5-day dunning schedule,
   prorated upgrades, period-end downgrades, one-click resume, and suspension
   that stops sending without touching customer data.
+- **Dunning is now emailed, not only logged.** Gap #5 above is closed by the
+  customer-lifecycle module below.
+
+---
+
+## Addendum — customer lifecycle audit (2026-10-03)
+
+The product could take a customer's money but could not talk to them. Outside
+password reset, the only email it had ever sent was a customer's own campaign:
+no welcome, no trial warning, no invoice, no receipt, no dunning notice, and
+nothing at all before sending was suspended.
+
+| Stage | Finding | Status |
+| --- | --- | --- |
+| Guest → signup | The operator console's "Allow new signups" switch was read by nothing; registration stayed open however it was set. `platform.name` and `platform.support_email` had no config file to override, so both resolved to null. | `config/platform.php` added; `EnsureRegistrationIsOpen` enforces the switch. |
+| Signup → activation | The first-run wizard was a mock. `testSmtp()` waited a second and toasted "SMTP Connected Successfully"; `importContacts()` waited 1.5s and toasted "Contacts imported". Neither made a request. New customers were congratulated three times and landed on an empty dashboard. | Replaced by `App\Services\ActivationChecklist` — five steps, each derived from real workspace state, surfaced on both the onboarding page and the dashboard. |
+| Abuse control | Anyone could open a workspace with any address, unverified, and send. For a platform that sends on a customer's behalf that is how IP ranges get listed. | Email verification enabled as a **send gate**, never a login wall: the whole product stays open, only the send button waits. |
+| Trial → paid | Nothing warned a trial was ending. | `TrialEnding`, 3 days out. |
+| Checkout | An invoice raised and abandoned was never mentioned again. | `InvoiceIssued` on creation; `InvoiceReminder` at day 1 (recovery) and day 3 (due soon) — two nudges, never more. |
+| Renewal | Cards were charged with no advance notice, the top chargeback trigger. | `RenewalReminder`, 3 days out, only when a charge will genuinely be attempted. |
+| Dunning | Declines were logged and retried silently. | `PaymentFailed` per attempt, escalating, with the next retry date. |
+| Suspension | Sending stopped with no warning and no notice. | `SuspensionWarning` 2 days out, `WorkspaceSuspended` on the day, `WorkspaceReinstated` when payment lands. A suspended workspace now gets a page explaining that nothing was deleted, not a bare 403. |
+| Usage | Customers discovered their monthly cap when recipients stopped receiving mail. | `UsageThresholdReached` at 80% and 100%. |
+| Churn | Cancellation captured nothing and confirmed nothing. | Reason vocabulary + optional note, captured on the subscription and surfaced to support; `SubscriptionCancelled` with a one-click undo; `WinBackOffer` once, a week after the drop to free. |
+
+Two properties are enforced by construction rather than by care:
+
+- **Exactly once.** Every message is claimed by a unique insert into
+  `lifecycle_messages` *before* it is sent, so concurrent schedulers, an
+  hourly cadence and an accidental re-run all produce one email. A duplicate
+  "your card was declined" reads as a second decline.
+- **Never fatal.** `LifecycleMessenger` reports and swallows its own failures.
+  A mail outage cannot roll back a settled payment or stop a suspension.
+
+Operators can see exactly what a workspace was told, and when, on the tenant
+page — because "did they get the warning?" is the first question support asks
+about any billing complaint.

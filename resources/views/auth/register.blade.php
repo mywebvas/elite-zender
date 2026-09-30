@@ -76,8 +76,8 @@
             <input type="checkbox" required id="terms"
                    class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500">
             <label for="terms" class="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-                I agree to the <a href="#" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Terms of Service</a>
-                and <a href="#" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Privacy Policy</a>
+                I agree to the <a href="{{ route('legal.terms') }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Terms of Service</a>
+                and <a href="{{ route('legal.privacy') }}" target="_blank" rel="noopener" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">Privacy Policy</a>
             </label>
         </div>
 

@@ -6,6 +6,174 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed — operator edits now reach the public site, and Paystack works
+
+- **The marketing page hardcoded its own pricing.** Not a stale copy of the
+  catalogue — a different product: a "$79 lifetime" tier and a "$29/yr Pro"
+  tier that existed nowhere, could not be bought, and contradicted the
+  schema.org offers a few lines above them on the same page. A visitor
+  clicking "Secure Lifetime Access — $79" landed on a billing page selling
+  monthly subscriptions at entirely different prices. Pricing, plan limits
+  and the structured data now render from the `plans` table — the same rows
+  the operator console edits — so a price change is live on the homepage,
+  in search results and at checkout the moment it is saved.
+- **Paystack payments could not complete.** `settings.country` was read by
+  `BillingService::currencyFor()` and written by nothing: there was no field
+  for it anywhere, so every workspace on earth was invoiced in USD. A
+  Nigerian Paystack account is NGN-only unless USD is explicitly enabled, so
+  `/transaction/initialize` answered "Currency not supported by merchant"
+  and the customer was stuck. There is now a billing-country selector, the
+  currency falls back to one a configured rail can actually collect, the
+  operator can declare which currencies their merchant account accepts, and
+  a currency refusal produces a message that says who needs to do what.
+- **"Product name" was honoured in nine places and ignored in nine others.**
+  Every layout, the SEO tags and the legal pages now read it.
+- **Terms of Service and Privacy Policy were `href="#"`** on the signup form
+  and a "coming soon" toast in the footer. Terms nobody can read are terms
+  nobody agreed to, and a missing privacy notice is a GDPR Article 13 failure
+  on its own. Both are now real pages describing how this product actually
+  handles data.
+- **Workspace settings pre-filled the signed-in user's name** as the
+  workspace name, so opening settings and pressing save renamed the
+  workspace to the person. The timezone dropdown had no `@selected`, so it
+  always read UTC and saving reset it.
+- A blank list-type platform setting is now left alone rather than erased,
+  matching how blank secrets already behaved.
+
+
+### Added — account security, life above the plan ceiling, and leaving
+
+- **Security alerts.** Changing the account email, changing the password,
+  resetting it, and switching two-factor on or off all happened in complete
+  silence. That is the recipe for account takeover: get a session, change
+  the address, then reset the password to one you control — every step a
+  legitimate action by an authenticated user, so nothing else objects. An
+  email change now warns the **old** address, because that is the only inbox
+  the real owner still controls. None of these can be switched off.
+- **Plan-limit overages.** A downgrade leaves a workspace holding more than
+  the new tier allows — ten seats on a one-seat plan, twenty thousand
+  contacts on a five-hundred plan. Nothing deleted it, which is correct, and
+  nothing mentioned it, which is not: customers met the limit as a silent
+  refusal months later. Now named on every page and in one email a month,
+  with an explicit promise that nothing will be deleted.
+- **Data export (GDPR Art. 15).** A streamed zip of contacts, lists,
+  campaigns, engagement history, team and relay configuration as UTF-8 CSV
+  with a BOM so Excel renders it correctly. Credentials are deliberately
+  excluded — an export travels, and a bearer credential against a customer's
+  sending domain has no business in one. Served behind the session, never a
+  public link, and shredded automatically after seven days.
+- **Workspace deletion (GDPR Art. 17).** Owner-only, re-authenticated,
+  requires typing the workspace name, and *scheduled* with a seven-day
+  cooling-off window that one click cancels. `suppression_entries` are
+  detached rather than cascaded: they hold one-way hashes and no addresses,
+  and they exist because a recipient asked never to be emailed again — a
+  promise made to them, not to the workspace.
+- **`elitesender:process-data-requests`**, hourly, with `--dry-run`.
+
+
+### Added — team seats, and the lifecycle gaps that survived the first pass
+
+- **Team members.** Every plan sold seats — Free 1, Starter 3, Growth 10,
+  Scale 25, Enterprise unlimited — the billing page rendered a usage meter
+  against that limit, and the plan cards advertised "10 team members" as a
+  headline feature. There was no route, no controller and no view: a Growth
+  customer paid $59 a month for nine seats that could not exist. Invitations
+  (hashed, single-use, expiring), role management, revocation, resend, and a
+  seat count that includes pending invitations so the number on the pricing
+  page means something.
+- **Offboarding is a security event.** Removing a member revokes their
+  sessions and API tokens and tells them it happened; the last owner cannot
+  be removed or demoted, and nobody can demote themselves.
+- **Activation drip.** A workspace that signs up and never connects a relay
+  got one welcome email and then silence forever — the biggest leak in the
+  funnel. Two nudges, at day 2 and day 6, naming the single blocking step,
+  both stopping the moment it is done.
+- **Card-expiry warnings.** Both gateways return the expiry on the first
+  charge and it was being discarded, so involuntary churn was only ever
+  discovered as a decline. Captured now, and warned 14 days out.
+- **Campaign reports.** A performance summary when a campaign finishes
+  delivering — the retention loop for a product whose value is measurement,
+  and event-driven rather than a digest that sometimes has nothing to say.
+- **Email preferences.** Setup nudges and campaign reports are opt-out.
+  Billing and security notices are not, by construction rather than by a
+  check somebody can forget.
+- Verification and password-reset emails now use the product's own shell
+  instead of stock Laravel markdown.
+
+### Fixed — three features that only pretended to work
+
+- **The SMTP "Test connection" button never opened a socket.** It waited 1.5
+  seconds and toasted "Connection test successful!". Customers learned the
+  truth when their first campaign silently failed, by which point the relay
+  was in rotation and the failures looked like a deliverability problem. It
+  now performs a real handshake and records the result on the relay.
+- **The IMAP settings form had no action.** The save button fired a success
+  toast and wrote nothing, so `ScanBounces` skipped every workspace on every
+  15-minute run and the entire Bounce Shield feature was unreachable — while
+  telling the customer it was configured. The form now saves, the password is
+  encrypted at rest, and the mailbox can be disconnected.
+- An architecture test now fails the build on any client-side success toast.
+  This codebase shipped that same lie three times.
+
+
+### Added — the customer lifecycle
+
+Before this the product could take money but could not talk to anyone. Outside
+password reset, the only email it had ever sent was a customer's own campaign.
+
+- **Transactional email foundation.** A branded, table-based, dark-mode-aware
+  email shell with an automatically derived plain-text alternative (a missing
+  `text/plain` part is a textbook spam signal, and hand-written ones rot).
+  Content is data, not twelve near-identical Blade files, so the whole set
+  cannot drift apart.
+- **Thirteen lifecycle messages**, half event-driven from `BillingService`
+  (invoice issued, payment received, payment failed, suspended, reinstated,
+  cancelled, welcome) and half time-driven from the new
+  `elitesender:lifecycle` command (trial ending, abandoned checkout, invoice
+  due, renewal reminder, suspension warning, usage thresholds, win-back).
+- **Exactly-once delivery.** Every message is claimed by a unique insert into
+  `lifecycle_messages` before it is sent, so concurrent schedulers, an hourly
+  cadence and an accidental re-run all produce one email. Operators can see
+  what a workspace was told, and when, on the tenant page.
+- **Abandoned-checkout recovery.** An invoice raised and left unpaid is
+  chased twice — once at day 1 with a direct link back to the payment page,
+  once at day 3 — and never again.
+- **Advance notice of every charge.** Recurring debits are announced three
+  days out, which is what card-network rules expect and the cheapest
+  chargeback prevention available.
+- **Usage alerts at 80% and 100%** of the monthly allowance, so a customer
+  finds out before recipients stop receiving mail rather than after.
+- **Cancellation reason capture** with a fixed vocabulary plus an optional
+  note, a "compare plans instead" save step, one-click undo, and a single
+  win-back check-in a week after the drop to free.
+- **Email verification, as a send gate rather than a login wall.** The whole
+  product stays open to an unverified owner; only the send button waits. For
+  a platform that sends on a customer's behalf, an unverified account is how
+  IP ranges get blocklisted.
+- **`elitesender:lifecycle`**, scheduled hourly with a `--dry-run` that
+  reports without claiming anything.
+
+### Fixed — activation and operator controls
+
+- **The first-run wizard was a mock.** `testSmtp()` waited one second and
+  toasted "SMTP Connected Successfully"; `importContacts()` waited 1.5s and
+  toasted "Contacts imported". Neither issued a single request — no relay was
+  created, no contact imported, nothing persisted. A new customer was
+  congratulated three times and landed on an empty dashboard unable to send.
+  Replaced with a checklist whose every tick is derived from real workspace
+  state, surfaced on both the onboarding page and the dashboard.
+- **"Allow new signups" did nothing.** The operator console wrote the setting
+  to the database and registration stayed open however it was set — the kind
+  of control an operator reaches for mid-incident.
+- **`platform.name` and `platform.support_email` had nothing to override.**
+  There was no `config/platform.php`, so both resolved to null wherever they
+  were read.
+- **A suspended workspace got a bare 403** with no reason, no contact and no
+  indication that the data still existed. It now gets a page that says so.
+- **The billing banner always pointed at the same generic page.** It now
+  links to the specific invoice that needs paying.
+
+
 ### Added — the operator console becomes a real control plane
 
 - **Audit trail.** Every destructive operator action is written to

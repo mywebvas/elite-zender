@@ -21,41 +21,49 @@
     ];
 @endphp
 
-<div {{ $attributes->merge(['class' => 'card flex flex-col gap-3 p-5']) }}>
-    <div class="flex items-start justify-between gap-3">
-        <p class="stat-label">{{ $label }}</p>
-        @if($icon)
-            <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg {{ $tones[$tone] ?? $tones['brand'] }}">
-                <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon }}"/>
-                </svg>
-            </div>
-        @endif
-    </div>
-
+<div {{ $attributes->merge(['class' => 'card flex flex-col justify-between gap-3 p-5 transition-all duration-200 hover:border-indigo-500/30']) }}>
     <div>
-        <p class="stat-value">{{ $value }}</p>
-
-        <div class="mt-1 flex items-center gap-2">
-            @if($trend !== null)
-                <span @class([
-                    'inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums',
-                    'text-emerald-600 dark:text-emerald-400' => $trend > 0,
-                    'text-rose-600 dark:text-rose-400' => $trend < 0,
-                    'text-slate-400' => $trend == 0,
-                ])>
-                    @if($trend != 0)
-                        <svg class="h-3 w-3 {{ $trend < 0 ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
-                        </svg>
-                    @endif
-                    {{ abs($trend) }}%
-                </span>
-            @endif
-
-            @if($hint)
-                <p class="truncate text-xs text-slate-400 dark:text-slate-500">{{ $hint }}</p>
+        <div class="flex items-start justify-between gap-3">
+            <p class="stat-label">{{ $label }}</p>
+            @if($icon)
+                <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl {{ $tones[$tone] ?? $tones['brand'] }}">
+                    <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="{{ $icon }}"/>
+                    </svg>
+                </div>
             @endif
         </div>
+
+        <div class="mt-2">
+            <p class="stat-value text-2xl font-black font-mono tracking-tight">{{ $value }}</p>
+
+            <div class="mt-1 flex items-center gap-2">
+                @if($trend !== null)
+                    <span @class([
+                        'inline-flex items-center gap-0.5 text-xs font-semibold tabular-nums',
+                        'text-emerald-600 dark:text-emerald-400' => $trend > 0,
+                        'text-rose-600 dark:text-rose-400' => $trend < 0,
+                        'text-slate-400' => $trend == 0,
+                    ])>
+                        @if($trend != 0)
+                            <svg class="h-3 w-3 {{ $trend < 0 ? 'rotate-180' : '' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M5 10l7-7m0 0l7 7m-7-7v18"/>
+                            </svg>
+                        @endif
+                        {{ abs($trend) }}%
+                    </span>
+                @endif
+
+                @if($hint)
+                    <p class="truncate text-xs text-slate-400 dark:text-slate-500">{{ $hint }}</p>
+                @endif
+            </div>
+        </div>
     </div>
+
+    @isset($sparkline)
+        <div class="pt-2 border-t border-slate-100 dark:border-white/[0.04]">
+            {{ $sparkline }}
+        </div>
+    @endisset
 </div>

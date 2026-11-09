@@ -1,4 +1,4 @@
-@props(['title' => '', 'size' => 'md'])
+@props(['title' => '', 'alpineTitle' => '', 'size' => 'md'])
 @php
 $maxw = ['sm'=>'sm:max-w-sm','md'=>'sm:max-w-lg','lg'=>'sm:max-w-2xl','xl'=>'sm:max-w-4xl'][$size] ?? 'sm:max-w-lg';
 @endphp
@@ -25,9 +25,9 @@ $maxw = ['sm'=>'sm:max-w-sm','md'=>'sm:max-w-lg','lg'=>'sm:max-w-2xl','xl'=>'sm:
                  class="relative transform overflow-hidden rounded-2xl bg-white dark:bg-[#0f0f14] text-left shadow-xl ring-1 ring-black/[0.08] dark:ring-white/[0.08] transition-all sm:my-8 sm:w-full {{ $maxw }}">
 
                 {{-- Header --}}
-                @if($title)
+                @if($title || $alpineTitle)
                 <div class="flex items-center justify-between px-6 py-5 border-b border-slate-200 dark:border-white/[0.06]">
-                    <h3 class="text-base font-bold text-slate-900 dark:text-white" id="modal-title">{{ $title }}</h3>
+                    <h3 class="text-base font-bold text-slate-900 dark:text-white" id="modal-title"@if($alpineTitle) x-text="{!! $alpineTitle !!}"@endif>{{ $title }}</h3>
                     <button type="button"
                             @click="$el.closest('[role=dialog]').dispatchEvent(new CustomEvent('close-modal',{bubbles:true}))"
                             class="rounded-lg p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 transition-colors">

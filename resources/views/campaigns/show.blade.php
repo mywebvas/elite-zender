@@ -139,17 +139,17 @@
                 </div>
             </div>
         </div>
-        <div class="flex-1 bg-white dark:bg-white flex flex-col">
-            <div class="px-4 py-3 bg-slate-100 border-b border-slate-200 flex items-center justify-between">
+        <div class="flex-1 bg-white dark:bg-[#0A0E18] flex flex-col rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 shadow-sm">
+            <div class="px-4 py-3 bg-slate-50 dark:bg-[#0D111C] border-b border-slate-200 dark:border-white/10 flex items-center justify-between">
                 <div class="flex gap-1.5">
-                    <div class="w-3 h-3 rounded-full bg-rose-400"></div>
-                    <div class="w-3 h-3 rounded-full bg-amber-400"></div>
-                    <div class="w-3 h-3 rounded-full bg-emerald-400"></div>
+                    <div class="w-3 h-3 rounded-full bg-[#ff5f56]"></div>
+                    <div class="w-3 h-3 rounded-full bg-[#ffbd2e]"></div>
+                    <div class="w-3 h-3 rounded-full bg-[#27c93f]"></div>
                 </div>
-                <span class="text-xs font-semibold text-slate-500">Live HTML Preview</span>
+                <span class="text-xs font-semibold text-slate-500 dark:text-slate-400">Rendered HTML Output</span>
             </div>
             <iframe 
-                class="w-full h-full border-0 bg-white" 
+                class="w-full min-h-[500px] border-0 bg-white text-slate-900" 
                 sandbox="allow-same-origin"
                 srcdoc="{{ htmlspecialchars($campaign->body_html ?? nl2br(e($campaign->body_text))) }}">
             </iframe>

@@ -52,7 +52,7 @@
                 no second verification step.
             </p>
 
-            <form method="POST" action="{{ route('team.invite') }}" class="mt-4 flex flex-col gap-3 sm:flex-row">
+            <form method="POST" action="{{ route('team.invite') }}" x-data="{ inviting: false }" @submit="inviting = true" class="mt-4 flex flex-col gap-3 sm:flex-row">
                 @csrf
 
                 <div class="flex-1">
@@ -79,7 +79,10 @@
                     @enderror
                 </div>
 
-                <x-button type="submit" variant="primary" class="sm:self-start">Send invitation</x-button>
+                <x-button type="submit" variant="primary" class="sm:self-start" x-bind:disabled="inviting">
+                    <svg x-show="inviting" class="w-4 h-4 animate-spin mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    <span x-show="!inviting">Send invitation</span><span x-show="inviting">Sending…</span>
+                </x-button>
             </form>
 
             <dl class="mt-5 grid gap-2 border-t border-slate-100 pt-4 text-xs text-slate-500 dark:border-white/[0.06] dark:text-slate-400 sm:grid-cols-2">

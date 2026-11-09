@@ -51,6 +51,25 @@
     --color-surface-bg-dark:   #050508;
     --color-surface-card-dark: #0f0f14;
 
+    /* ── Stitch Deliverability Surfaces ───────────────────────────────────── */
+    --color-surface-lowest:  #0a0e18;
+    --color-surface-low:     #171b26;
+    --color-surface-base:    #0f131d;
+    --color-surface-card-stitch: #1c1f2a;
+    --color-surface-high:    #262a35;
+    --color-surface-highest: #313540;
+
+    --color-outline-subtle:  rgba(70, 69, 84, 0.3);
+    --color-outline-muted:   #908fa0;
+    --color-outline-border:  #464554;
+
+    /* ── Stitch Brand & Accents ───────────────────────────────────────────── */
+    --color-stitch-primary:    #c0c1ff;
+    --color-stitch-primary-bg: #8083ff;
+    --color-stitch-secondary:  #3626ce;
+    --color-stitch-mint:       #4edea3;
+    --color-stitch-mint-dark:  #00885d;
+
     /* ── Semantic ────────────────────────────────────────────────────────── */
     --color-success: #059669;
     --color-danger:  #e11d48;
@@ -206,6 +225,33 @@
     transform: translateY(-1px);
     border-color: rgba(79, 70, 229, 0.25);
     box-shadow: 0 12px 32px -12px rgba(15, 23, 42, 0.14);
+}
+@utility card-stitch {
+    border-radius: 1rem;
+    background-color: #171b26;
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 32px -8px rgba(0, 0, 0, 0.5);
+}
+@utility spin-token {
+    background: rgba(128, 131, 255, 0.15);
+    border: 1px solid rgba(192, 193, 255, 0.35);
+    color: #c0c1ff;
+    border-radius: 0.375rem;
+    padding: 0.125rem 0.375rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+}
+@utility spin-group {
+    background: rgba(78, 222, 163, 0.12);
+    border: 1px dashed rgba(78, 222, 163, 0.4);
+    color: #4edea3;
+    border-radius: 0.375rem;
+    padding: 0.125rem 0.375rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+}
+@utility ambient-glow {
+    background-image: radial-gradient(ellipse 80% 50% at 50% -10%, rgba(99, 102, 241, 0.18) 0%, transparent 70%);
 }
 
 /* ── Forms ───────────────────────────────────────────────────────────────── */

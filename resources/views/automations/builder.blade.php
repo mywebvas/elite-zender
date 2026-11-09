@@ -252,8 +252,10 @@
                     </p>
 
                     <div class="space-y-3 border-t border-slate-200 pt-4 dark:border-slate-800">
-                        <x-button type="submit" variant="primary" class="w-full justify-center">
-                            {{ $automation->exists ? 'Save changes' : 'Create automation' }}
+                        <x-button type="submit" variant="primary" class="w-full justify-center" x-bind:disabled="saving">
+                            <svg x-show="saving" class="w-4 h-4 animate-spin mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                            <span x-show="!saving">{{ $automation->exists ? 'Save changes' : 'Create automation' }}</span>
+                            <span x-show="saving">Saving…</span>
                         </x-button>
                         <x-button type="button" href="{{ route('automations.index') }}" variant="ghost" class="w-full justify-center">
                             Cancel
@@ -267,6 +269,7 @@
     @push('scripts')
     <script nonce="{{ $cspNonce ?? '' }}">
         window.automationBuilderData = () => ({
+            saving: false,
             name: @json(old('name', $automation->name ?? '')),
             triggerType: @json(old('trigger_type', $automation->trigger_type ?? '')),
             triggerConfig: Object.assign(
@@ -364,6 +367,7 @@
                         });
                     });
 
+                this.saving = true;
                 return true;
             },
         });

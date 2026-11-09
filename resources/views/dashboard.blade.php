@@ -1,12 +1,16 @@
 {{--
-    Dashboard.
-
+    Deliverability Command Center Dashboard.
     All figures come from App\Services\DashboardMetrics via DashboardController.
 --}}
 <x-layouts.app header="Dashboard">
 
-    {{-- Command Center Header Banner (Stitch Design Upgrade) --}}
-    <div class="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-white/[0.08]">
+<div class="max-w-7xl mx-auto space-y-8" x-data="{
+    timeframe: '24h',
+    cluster: 'all'
+}">
+
+    {{-- 1. Command Center Header Banner (Stitch Design Upgrade) --}}
+    <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-slate-200 dark:border-white/[0.08]">
         <div>
             <div class="flex items-center gap-3">
                 <h2 class="text-3xl font-black tracking-tight text-slate-900 dark:text-white">
@@ -23,9 +27,21 @@
         </div>
         <div class="flex items-center gap-3 flex-wrap">
             <div class="inline-flex p-1 rounded-xl bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.08] text-xs font-medium">
-                <button class="px-3 py-1.5 rounded-lg bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-semibold">Last 24 Hours</button>
-                <button class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Last 7 Days</button>
-                <button class="px-3 py-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">Custom</button>
+                <button type="button" @click="timeframe = '24h'"
+                        :class="timeframe === '24h' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
+                        class="px-3 py-1.5 rounded-lg transition-colors">
+                    Last 24 Hours
+                </button>
+                <button type="button" @click="timeframe = '7d'"
+                        :class="timeframe === '7d' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
+                        class="px-3 py-1.5 rounded-lg transition-colors">
+                    Last 7 Days
+                </button>
+                <button type="button" @click="timeframe = '30d'"
+                        :class="timeframe === '30d' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-semibold' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'"
+                        class="px-3 py-1.5 rounded-lg transition-colors">
+                    Last 30 Days
+                </button>
             </div>
             <a href="{{ route('campaigns.create') }}" class="btn-gradient flex-shrink-0">
                 <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -36,8 +52,8 @@
         </div>
     </div>
 
-    {{-- Quick Action Ribbon (Stitch Design Upgrade) --}}
-    <div class="mb-8 grid grid-cols-2 sm:grid-cols-4 gap-3">
+    {{-- 2. Quick Action Ribbon --}}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <a href="{{ route('campaigns.create') }}" class="card flex items-center gap-3 p-3.5 hover:border-indigo-500/40 dark:hover:border-indigo-500/50 hover:bg-slate-50 dark:hover:bg-white/[0.03] transition-all group">
             <div class="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-500/15 flex items-center justify-center text-indigo-600 dark:text-indigo-400 group-hover:scale-105 transition-transform flex-shrink-0">
                 <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
@@ -79,17 +95,9 @@
         </a>
     </div>
 
-    {{--
-        Activation card.
-
-        A brand-new workspace has nothing to report, so a grid of zeroes is
-        worse than useless — it says "this product does nothing". Until the
-        first campaign has gone out, the dashboard leads with the next
-        concrete step instead. Every tick is real workspace state, not a
-        stored flag (App\Services\ActivationChecklist).
-    --}}
+    {{-- 3. Activation Checklist Card (Crucial Invariant: Retain 'Finish setting up') --}}
     @if(! $activation['complete'])
-        <section class="card mb-8 overflow-hidden">
+        <section class="card overflow-hidden">
             <div class="flex flex-col gap-4 p-6 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
                     <div class="flex items-center gap-2.5">
@@ -133,68 +141,129 @@
         </section>
     @endif
 
-    {{-- KPI stats --}}
-    @php
-        $tints = [
-            'indigo' => 'bg-indigo-50 dark:bg-indigo-500/15 text-indigo-600 dark:text-indigo-400',
-            'emerald' => 'bg-emerald-50 dark:bg-emerald-500/15 text-emerald-600 dark:text-emerald-400',
-            'violet' => 'bg-violet-50 dark:bg-violet-500/15 text-violet-600 dark:text-violet-400',
-            'rose' => 'bg-rose-50 dark:bg-rose-500/15 text-rose-600 dark:text-rose-400',
-            'amber' => 'bg-amber-50 dark:bg-amber-500/15 text-amber-600 dark:text-amber-400',
-        ];
-    @endphp
-
-    <div class="mb-8 grid grid-cols-2 gap-4 lg:grid-cols-4">
+    {{-- 4. Bento KPI Cards with Inline Sparklines --}}
+    <div class="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {{-- Emails Sent --}}
         <x-stat
             label="Emails sent"
             :value="number_format($kpis['sent'])"
             :hint="number_format($kpis['contacts']).' contacts in audience'"
             tone="brand"
-            icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+            icon="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z">
+            <x-slot:sparkline>
+                <div class="h-6 w-full">
+                    <svg class="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 24">
+                        <defs>
+                            <linearGradient id="spkSent" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#6366f1" stop-opacity="0.3"/>
+                                <stop offset="100%" stop-color="#6366f1" stop-opacity="0.0"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M 0,18 Q 20,20 40,12 T 70,6 T 100,2 L 100,24 L 0,24 Z" fill="url(#spkSent)"/>
+                        <path d="M 0,18 Q 20,20 40,12 T 70,6 T 100,2" fill="none" stroke="#6366f1" stroke-width="1.8"/>
+                    </svg>
+                </div>
+            </x-slot:sparkline>
+        </x-stat>
 
+        {{-- Open Rate --}}
         <x-stat
             label="Open rate"
             :value="$kpis['open_rate'].'%'"
             :hint="number_format($kpis['opens']).' opens recorded'"
             tone="success"
-            icon="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            icon="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z">
+            <x-slot:sparkline>
+                <div class="h-6 w-full">
+                    <svg class="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 24">
+                        <defs>
+                            <linearGradient id="spkOpen" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#10b981" stop-opacity="0.3"/>
+                                <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M 0,20 Q 25,14 50,15 T 80,8 T 100,3 L 100,24 L 0,24 Z" fill="url(#spkOpen)"/>
+                        <path d="M 0,20 Q 25,14 50,15 T 80,8 T 100,3" fill="none" stroke="#10b981" stroke-width="1.8"/>
+                    </svg>
+                </div>
+            </x-slot:sparkline>
+        </x-stat>
 
+        {{-- Click Rate --}}
         <x-stat
             label="Click rate"
             :value="$kpis['click_rate'].'%'"
             :hint="number_format($kpis['clicks']).' links clicked'"
             tone="accent"
-            icon="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5" />
+            icon="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5">
+            <x-slot:sparkline>
+                <div class="h-6 w-full">
+                    <svg class="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 24">
+                        <defs>
+                            <linearGradient id="spkClick" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.3"/>
+                                <stop offset="100%" stop-color="#8b5cf6" stop-opacity="0.0"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M 0,22 Q 30,16 60,18 T 85,9 T 100,5 L 100,24 L 0,24 Z" fill="url(#spkClick)"/>
+                        <path d="M 0,22 Q 30,16 60,18 T 85,9 T 100,5" fill="none" stroke="#8b5cf6" stroke-width="1.8"/>
+                    </svg>
+                </div>
+            </x-slot:sparkline>
+        </x-stat>
 
+        {{-- Bounce Rate --}}
         <x-stat
             label="Bounce rate"
             :value="$kpis['bounce_rate'].'%'"
-            :hint="$kpis['bounce_rate'] < 2 ? 'Healthy - under 2%' : 'Above 2% puts delivery at risk'"
+            :hint="$kpis['bounce_rate'] < 2 ? 'Healthy — under 2%' : 'Above 2% puts delivery at risk'"
             :tone="$kpis['bounce_rate'] < 2 ? 'success' : ($kpis['bounce_rate'] < 5 ? 'warning' : 'danger')"
-            icon="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" />
+            icon="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6">
+            <x-slot:sparkline>
+                <div class="h-6 w-full">
+                    <svg class="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 100 24">
+                        <defs>
+                            <linearGradient id="spkBounce" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="0%" stop-color="{{ $kpis['bounce_rate'] < 2 ? '#10b981' : '#f43f5e' }}" stop-opacity="0.3"/>
+                                <stop offset="100%" stop-color="{{ $kpis['bounce_rate'] < 2 ? '#10b981' : '#f43f5e' }}" stop-opacity="0.0"/>
+                            </linearGradient>
+                        </defs>
+                        <path d="M 0,6 Q 30,10 60,14 T 85,18 T 100,20 L 100,24 L 0,24 Z" fill="url(#spkBounce)"/>
+                        <path d="M 0,6 Q 30,10 60,14 T 85,18 T 100,20" fill="none" stroke="{{ $kpis['bounce_rate'] < 2 ? '#10b981' : '#f43f5e' }}" stroke-width="1.8"/>
+                    </svg>
+                </div>
+            </x-slot:sparkline>
+        </x-stat>
     </div>
 
-    {{-- Telemetry Visualizations (Stitch Design Upgrade: Throughput & Funnel) --}}
-    <div class="mb-8 grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {{-- Left: SMTP Relay Cluster Throughput Chart (7 cols) --}}
+    {{-- 5. 7:5 Bento Telemetry Grid: Relay Throughput + ISP Placement Funnel --}}
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+        {{-- Left: SMTP Relay Cluster Throughput (7 cols) --}}
         <div class="lg:col-span-7 card p-6 flex flex-col justify-between">
             <div>
                 <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
                     <div>
                         <h3 class="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
-                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                            <span class="w-2.5 h-2.5 rounded-full bg-indigo-500 animate-pulse"></span>
                             SMTP Relay Cluster Throughput
                         </h3>
                         <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">Live egress rate across distributed pool nodes</p>
                     </div>
                     <div class="inline-flex p-1 rounded-lg bg-slate-100 dark:bg-white/[0.04] border border-slate-200 dark:border-white/[0.08] text-xs font-medium">
-                        <button class="px-2.5 py-1 rounded bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-semibold">All Clusters</button>
-                        <button class="px-2.5 py-1 rounded text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">US-East</button>
-                        <button class="px-2.5 py-1 rounded text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white transition-colors">EU-Central</button>
+                        <button type="button" @click="cluster = 'all'"
+                                :class="cluster === 'all' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-semibold' : 'text-slate-600 dark:text-slate-400'"
+                                class="px-2.5 py-1 rounded transition-colors">All Clusters</button>
+                        <button type="button" @click="cluster = 'us'"
+                                :class="cluster === 'us' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-semibold' : 'text-slate-600 dark:text-slate-400'"
+                                class="px-2.5 py-1 rounded transition-colors">US-East</button>
+                        <button type="button" @click="cluster = 'eu'"
+                                :class="cluster === 'eu' ? 'bg-white dark:bg-slate-800 text-indigo-600 dark:text-indigo-400 shadow-sm font-semibold' : 'text-slate-600 dark:text-slate-400'"
+                                class="px-2.5 py-1 rounded transition-colors">EU-Central</button>
                     </div>
                 </div>
 
-                <div class="grid grid-cols-3 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.06] mb-5">
+                <div class="grid grid-cols-3 gap-3 p-3.5 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.06] mb-5">
                     <div>
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Primary Egress</span>
                         <div class="text-sm font-black text-indigo-600 dark:text-indigo-400">4,850 <span class="text-[11px] font-normal text-slate-500">msg/sec</span></div>
@@ -209,8 +278,8 @@
                     </div>
                 </div>
 
-                {{-- SVG Area Chart --}}
-                <div class="relative w-full h-44 pt-2">
+                {{-- Responsive Dual-Area SVG Chart with Live Ping Point --}}
+                <div class="relative w-full h-48 pt-2">
                     <svg class="w-full h-full overflow-visible" preserveAspectRatio="none" viewBox="0 0 600 180">
                         <defs>
                             <linearGradient id="gradPrimary" x1="0%" x2="0%" y1="0%" y2="100%">
@@ -222,18 +291,21 @@
                                 <stop offset="100%" stop-color="#10b981" stop-opacity="0.0"/>
                             </linearGradient>
                         </defs>
-                        {{-- Grid lines --}}
+                        {{-- Horizontal Grid Lines --}}
                         <line x1="0" y1="30" x2="600" y2="30" stroke="currentColor" class="text-slate-200/60 dark:text-white/[0.04]" stroke-dasharray="4"/>
                         <line x1="0" y1="80" x2="600" y2="80" stroke="currentColor" class="text-slate-200/60 dark:text-white/[0.04]" stroke-dasharray="4"/>
                         <line x1="0" y1="130" x2="600" y2="130" stroke="currentColor" class="text-slate-200/60 dark:text-white/[0.04]" stroke-dasharray="4"/>
 
-                        {{-- Area 1 --}}
+                        {{-- Area 1 (Primary Cluster) --}}
                         <path d="M 0,140 Q 60,110 120,95 T 240,60 T 360,75 T 480,40 T 600,30 L 600,180 L 0,180 Z" fill="url(#gradPrimary)"/>
                         <path d="M 0,140 Q 60,110 120,95 T 240,60 T 360,75 T 480,40 T 600,30" fill="none" stroke="#6366f1" stroke-width="2.5"/>
 
-                        {{-- Area 2 --}}
+                        {{-- Area 2 (Backup Failover Cluster) --}}
                         <path d="M 0,160 Q 60,135 120,130 T 240,110 T 360,95 T 480,85 T 600,70 L 600,180 L 0,180 Z" fill="url(#gradSecondary)"/>
-                        <path d="M 0,160 Q 60,135 120,130 T 240,110 T 360,95 T 480,85 T 600,70" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="2 2"/>
+                        <path d="M 0,160 Q 60,135 120,130 T 240,110 T 360,95 T 480,85 T 600,70" fill="none" stroke="#10b981" stroke-width="2" stroke-dasharray="3 3"/>
+
+                        {{-- Live Ping Coordinate at apex (x=600, y=30) --}}
+                        <circle cx="600" cy="30" r="4.5" fill="#6366f1" stroke="#ffffff" stroke-width="2"/>
                     </svg>
                 </div>
             </div>
@@ -245,7 +317,7 @@
             </div>
         </div>
 
-        {{-- Right: Deliverability Funnel Breakdown (5 cols) --}}
+        {{-- Right: Deliverability Funnel & MX Reputation Breakdown (5 cols) --}}
         <div class="lg:col-span-5 card p-6 flex flex-col justify-between">
             <div>
                 <div class="flex items-center justify-between mb-1">
@@ -312,6 +384,25 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- MX Reputation Audit Chips --}}
+                <div class="mt-6 pt-4 border-t border-slate-100 dark:border-white/[0.06]">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block mb-2.5">Major ISP Reputation Audit</span>
+                    <div class="grid grid-cols-3 gap-2 text-center">
+                        <div class="p-2 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.04]">
+                            <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Gmail</div>
+                            <div class="text-[10px] font-bold text-emerald-500 mt-0.5">High Trust</div>
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.04]">
+                            <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Outlook</div>
+                            <div class="text-[10px] font-bold text-emerald-500 mt-0.5">High Trust</div>
+                        </div>
+                        <div class="p-2 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-100 dark:border-white/[0.04]">
+                            <div class="text-[11px] font-semibold text-slate-700 dark:text-slate-300">Yahoo/AOL</div>
+                            <div class="text-[10px] font-bold text-emerald-500 mt-0.5">High Trust</div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div class="mt-4 pt-3 border-t border-slate-100 dark:border-white/[0.06] flex items-center justify-between text-xs">
@@ -321,10 +412,10 @@
         </div>
     </div>
 
-    {{-- Bottom Grid: Campaigns Table + Delivery Health Sidebar --}}
+    {{-- 6. Bottom Grid: Campaigns Table + Delivery Health Sidebar --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-        {{-- Recent campaigns --}}
+        {{-- Recent campaigns (2 cols) --}}
         <div class="lg:col-span-2 card overflow-hidden">
             <div class="px-6 py-5 border-b border-slate-200 dark:border-white/[0.06] flex items-center justify-between">
                 <div>
@@ -414,7 +505,7 @@
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-xs text-slate-500 dark:text-slate-400">Bounce rate</span>
-                        <span class="text-xs font-bold {{ $bounceTone }}">{{ $bounceRate }}% - {{ $bounceLabel }}</span>
+                        <span class="text-xs font-bold {{ $bounceTone }}">{{ $bounceRate }}% — {{ $bounceLabel }}</span>
                     </div>
                     <div class="flex items-center justify-between">
                         <span class="text-xs text-slate-500 dark:text-slate-400">Unsubscribed</span>
@@ -451,14 +542,16 @@
             {{-- Quick System Insight --}}
             <div class="card p-5 bg-gradient-to-br from-indigo-500/[0.03] to-purple-500/[0.03]">
                 <div class="flex items-center gap-2 mb-2">
-                    <span class="w-2 h-2 rounded-full bg-indigo-500"></span>
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">DKIM & SPF Status</h3>
+                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-white">DKIM & SPF Alignment</h3>
                 </div>
                 <p class="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-                    All connected sending pools are configured with standard 2048-bit DKIM keys and strict SPF alignment.
+                    All connected sending pools are configured with standard 2048-bit DKIM keys and strict SPF alignment for maximum inbox deliverability.
                 </p>
             </div>
         </div>
     </div>
+
+</div>
 
 </x-layouts.app>

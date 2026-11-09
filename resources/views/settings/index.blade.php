@@ -20,14 +20,14 @@
 
         <div class="lg:grid lg:grid-cols-12 lg:gap-x-8">
             {{-- Navigation Sidebar --}}
-            <aside class="py-6 lg:col-span-3">
-                <nav class="space-y-1">
+            <aside class="py-3 lg:py-6 lg:col-span-3">
+                <nav class="flex lg:flex-col overflow-x-auto gap-1 pb-2 lg:pb-0">
                     <!-- General -->
                     <button type="button" @click="setTab('general')"
-                            :class="activeTab === 'general' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
-                            class="group flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl w-full text-left transition-colors">
+                            :class="activeTab === 'general' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold shadow-xs' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
+                            class="group flex items-center px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0 whitespace-nowrap lg:w-full text-left transition-colors">
                         <svg :class="activeTab === 'general' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'"
-                             class="flex-shrink-0 -ml-1 mr-3 h-5 w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             class="flex-shrink-0 -ml-1 mr-2.5 h-4 w-4 sm:h-5 sm:w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
                         </svg>
@@ -36,10 +36,10 @@
 
                     <!-- Security -->
                     <button type="button" @click="setTab('security')"
-                            :class="activeTab === 'security' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
-                            class="group flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl w-full text-left transition-colors">
+                            :class="activeTab === 'security' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold shadow-xs' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
+                            class="group flex items-center px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0 whitespace-nowrap lg:w-full text-left transition-colors">
                         <svg :class="activeTab === 'security' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'"
-                             class="flex-shrink-0 -ml-1 mr-3 h-5 w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             class="flex-shrink-0 -ml-1 mr-2.5 h-4 w-4 sm:h-5 sm:w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
                         </svg>
                         <span class="truncate">Security & 2FA</span>
@@ -47,10 +47,10 @@
 
                     <!-- Bounce Shield -->
                     <button type="button" @click="setTab('bounce')"
-                            :class="activeTab === 'bounce' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
-                            class="group flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl w-full text-left transition-colors">
+                            :class="activeTab === 'bounce' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold shadow-xs' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
+                            class="group flex items-center px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0 whitespace-nowrap lg:w-full text-left transition-colors">
                         <svg :class="activeTab === 'bounce' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'"
-                             class="flex-shrink-0 -ml-1 mr-3 h-5 w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             class="flex-shrink-0 -ml-1 mr-2.5 h-4 w-4 sm:h-5 sm:w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
                         </svg>
                         <span class="truncate">Bounce Handling</span>
@@ -58,10 +58,10 @@
 
                     <!-- Email Preferences -->
                     <button type="button" @click="setTab('notifications')"
-                            :class="activeTab === 'notifications' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
-                            class="group flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl w-full text-left transition-colors">
+                            :class="activeTab === 'notifications' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold shadow-xs' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
+                            class="group flex items-center px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0 whitespace-nowrap lg:w-full text-left transition-colors">
                         <svg :class="activeTab === 'notifications' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'"
-                             class="flex-shrink-0 -ml-1 mr-3 h-5 w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             class="flex-shrink-0 -ml-1 mr-2.5 h-4 w-4 sm:h-5 sm:w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path>
                         </svg>
                         <span class="truncate">Email Preferences</span>
@@ -69,10 +69,10 @@
 
                     <!-- Data & Privacy (GDPR) -->
                     <button type="button" @click="setTab('data')"
-                            :class="activeTab === 'data' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
-                            class="group flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl w-full text-left transition-colors">
+                            :class="activeTab === 'data' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold shadow-xs' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
+                            class="group flex items-center px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0 whitespace-nowrap lg:w-full text-left transition-colors">
                         <svg :class="activeTab === 'data' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'"
-                             class="flex-shrink-0 -ml-1 mr-3 h-5 w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             class="flex-shrink-0 -ml-1 mr-2.5 h-4 w-4 sm:h-5 sm:w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
                         </svg>
                         <span class="truncate">Data & Privacy (GDPR)</span>
@@ -80,10 +80,10 @@
 
                     <!-- Tracking Domains -->
                     <button type="button" @click="setTab('tracking')"
-                            :class="activeTab === 'tracking' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
-                            class="group flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl w-full text-left transition-colors">
+                            :class="activeTab === 'tracking' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold shadow-xs' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
+                            class="group flex items-center px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0 whitespace-nowrap lg:w-full text-left transition-colors">
                         <svg :class="activeTab === 'tracking' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'"
-                             class="flex-shrink-0 -ml-1 mr-3 h-5 w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             class="flex-shrink-0 -ml-1 mr-2.5 h-4 w-4 sm:h-5 sm:w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
                         </svg>
                         <span class="truncate">Tracking Domains</span>
@@ -91,10 +91,10 @@
 
                     <!-- API Keys -->
                     <button type="button" @click="setTab('api')"
-                            :class="activeTab === 'api' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
-                            class="group flex items-center px-3.5 py-2.5 text-sm font-medium rounded-xl w-full text-left transition-colors">
+                            :class="activeTab === 'api' ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 font-semibold shadow-xs' : 'text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-white/5'"
+                            class="group flex items-center px-3.5 py-2 text-xs sm:text-sm font-medium rounded-xl flex-shrink-0 whitespace-nowrap lg:w-full text-left transition-colors">
                         <svg :class="activeTab === 'api' ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300'"
-                             class="flex-shrink-0 -ml-1 mr-3 h-5 w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                             class="flex-shrink-0 -ml-1 mr-2.5 h-4 w-4 sm:h-5 sm:w-5 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
                         </svg>
                         <span class="truncate">API Keys</span>

@@ -20,9 +20,15 @@
         <div class="flex items-center gap-2">
             @if($campaign->status === 'draft')
                 <a href="{{ route('campaigns.edit', $campaign->id) }}" class="btn-gradient">Edit Content</a>
-                <form action="{{ route('campaigns.dispatch', $campaign->id) }}" method="POST">
+                <form action="{{ route('campaigns.dispatch', $campaign->id) }}" method="POST"
+                      x-data="{ sending: false }"
+                      @submit="if(sending){ $event.preventDefault(); return false; } sending = true;">
                     @csrf
-                    <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20 transition-all">Send Now</button>
+                    <button type="submit" :disabled="sending"
+                            :class="{ 'opacity-60 cursor-not-allowed': sending }"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-500/10 dark:text-emerald-400 dark:hover:bg-emerald-500/20 transition-all">
+                        <span x-text="sending ? 'Sending...' : 'Send Now'">Send Now</span>
+                    </button>
                 </form>
             @endif
             

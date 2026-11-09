@@ -67,14 +67,23 @@
                     @endforeach
                 </dl>
 
-                <form method="POST" action="{{ route('billing.proof', $invoice->id) }}" enctype="multipart/form-data" class="mt-5 flex flex-wrap items-end gap-3">
+                <form method="POST" action="{{ route('billing.proof', $invoice->id) }}" enctype="multipart/form-data"
+                      x-data="{ submitting: false }" @submit="if(submitting){ $event.preventDefault(); return false; } submitting = true"
+                      class="mt-5 flex flex-wrap items-end gap-3">
                     @csrf
                     <input type="hidden" name="reference" value="{{ session('bank_reference') }}">
                     <div class="flex-1">
                         <label for="proof" class="input-label">Upload proof of payment</label>
                         <input id="proof" type="file" name="proof" accept=".jpg,.jpeg,.png,.pdf" required class="input">
                     </div>
-                    <x-button type="submit" variant="primary">Submit</x-button>
+                    <button type="submit" :disabled="submitting"
+                            class="btn-primary inline-flex items-center justify-center gap-1.5 transition disabled:opacity-60 disabled:cursor-not-allowed">
+                        <span x-show="!submitting">Submit</span>
+                        <span x-show="submitting" x-cloak class="inline-flex items-center gap-1.5">
+                            <svg class="h-4 w-4 animate-spin text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
+                            Uploading...
+                        </span>
+                    </button>
                 </form>
             </div>
         @endif
@@ -85,10 +94,13 @@
                 <h3 class="mb-4 text-base font-bold text-slate-900 dark:text-white">Pay this invoice</h3>
 
                 @forelse($gateways as $key => $gateway)
-                    <form method="POST" action="{{ route('billing.checkout.start', $invoice->id) }}" class="mb-3">
+                    <form method="POST" action="{{ route('billing.checkout.start', $invoice->id) }}"
+                          x-data="{ starting: false }" @submit="if(starting){ $event.preventDefault(); return false; } starting = true"
+                          class="mb-3">
                         @csrf
                         <input type="hidden" name="gateway" value="{{ $key }}">
-                        <button type="submit"
+                        <button type="submit" :disabled="starting"
+                                :class="{ 'opacity-60 cursor-not-allowed': starting }"
                                 class="flex w-full items-center justify-between rounded-xl border border-slate-200 p-4 text-left transition hover:border-indigo-400 hover:bg-indigo-50/50 dark:border-white/10 dark:hover:border-indigo-500 dark:hover:bg-indigo-500/5">
                             <span>
                                 <span class="block text-sm font-semibold text-slate-900 dark:text-white">{{ $gateway->label() }}</span>
@@ -100,7 +112,10 @@
                                     @endif
                                 </span>
                             </span>
-                            <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                            <span class="inline-flex items-center">
+                                <span x-show="starting" x-cloak class="mr-2 text-xs font-mono text-indigo-500">Connecting...</span>
+                                <svg class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/></svg>
+                            </span>
                         </button>
                     </form>
                 @empty

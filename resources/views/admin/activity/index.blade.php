@@ -36,7 +36,7 @@
         <form method="GET" action="{{ route('admin.activity.index') }}" class="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-6">
             {{-- Operator Dropdown --}}
             <div class="relative">
-                <select name="admin" class="w-full appearance-none rounded-xl border-0 bg-white/[0.04] px-3.5 py-2.5 pr-8 text-xs text-white ring-1 ring-white/10 focus:bg-[#0e0e18] focus:outline-none focus:ring-2 focus:ring-amber-500/60">
+                <select name="admin" @change="$el.form.requestSubmit()" class="w-full appearance-none rounded-xl border-0 bg-white/[0.04] px-3.5 py-2.5 pr-8 text-xs text-white ring-1 ring-white/10 focus:bg-[#0e0e18] focus:outline-none focus:ring-2 focus:ring-amber-500/60">
                     <option value="" class="bg-[#0e0e18] text-white">Any operator</option>
                     @foreach($admins as $admin)
                         <option value="{{ $admin->id }}" class="bg-[#0e0e18] text-white" @selected(request('admin') === $admin->id)>
@@ -51,7 +51,7 @@
 
             {{-- Action Dropdown --}}
             <div class="relative">
-                <select name="action" class="w-full appearance-none rounded-xl border-0 bg-white/[0.04] px-3.5 py-2.5 pr-8 text-xs text-white ring-1 ring-white/10 focus:bg-[#0e0e18] focus:outline-none focus:ring-2 focus:ring-amber-500/60 font-mono">
+                <select name="action" @change="$el.form.requestSubmit()" class="w-full appearance-none rounded-xl border-0 bg-white/[0.04] px-3.5 py-2.5 pr-8 text-xs text-white ring-1 ring-white/10 focus:bg-[#0e0e18] focus:outline-none focus:ring-2 focus:ring-amber-500/60 font-mono">
                     <option value="" class="bg-[#0e0e18] text-white font-sans">Any action</option>
                     @foreach($actions as $action)
                         <option value="{{ $action }}" class="bg-[#0e0e18] text-white font-mono" @selected(request('action') === $action)>
@@ -66,7 +66,7 @@
 
             {{-- Severity Dropdown --}}
             <div class="relative">
-                <select name="severity" class="w-full appearance-none rounded-xl border-0 bg-white/[0.04] px-3.5 py-2.5 pr-8 text-xs text-white ring-1 ring-white/10 focus:bg-[#0e0e18] focus:outline-none focus:ring-2 focus:ring-amber-500/60">
+                <select name="severity" @change="$el.form.requestSubmit()" class="w-full appearance-none rounded-xl border-0 bg-white/[0.04] px-3.5 py-2.5 pr-8 text-xs text-white ring-1 ring-white/10 focus:bg-[#0e0e18] focus:outline-none focus:ring-2 focus:ring-amber-500/60">
                     <option value="" class="bg-[#0e0e18] text-white">Any severity</option>
                     @foreach(['critical', 'notice', 'info'] as $severity)
                         <option value="{{ $severity }}" class="bg-[#0e0e18] text-white" @selected(request('severity') === $severity)>

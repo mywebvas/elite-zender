@@ -84,27 +84,29 @@
                                 @if(auth('admin')->user()?->canManage())
                                     {{-- Confirm form with optional audit note --}}
                                     <form method="POST" action="{{ route('admin.payments.confirm', $payment->id) }}"
-                                          onsubmit="return confirm('Confirm receipt of payment and settle invoice {{ $payment->invoice?->number }}?')">
+                                          x-data="{ confirming: false }"
+                                          @submit="if(confirming){ $event.preventDefault(); return false; } if(!confirm('Confirm receipt of payment and settle invoice {{ $payment->invoice?->number }}?')){ return false; } confirming = true">
                                         @csrf
-                                        <button type="submit"
-                                                class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 shadow-sm transition hover:bg-emerald-400 active:scale-[0.98]">
+                                        <button type="submit" :disabled="confirming"
+                                                class="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500 px-4 py-2 text-xs font-semibold text-slate-950 shadow-sm transition hover:bg-emerald-400 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed">
                                             <svg class="h-4 w-4 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" />
                                             </svg>
-                                            <span>Confirm</span>
+                                            <span x-text="confirming ? 'Confirming…' : 'Confirm'">Confirm</span>
                                         </button>
                                     </form>
 
                                     {{-- Reject form --}}
                                     <form method="POST" action="{{ route('admin.payments.reject', $payment->id) }}"
-                                          onsubmit="return confirm('Reject this bank transfer receipt?')">
+                                          x-data="{ rejecting: false }"
+                                          @submit="if(rejecting){ $event.preventDefault(); return false; } if(!confirm('Reject this bank transfer receipt?')){ return false; } rejecting = true">
                                         @csrf
-                                        <button type="submit"
-                                                class="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 active:scale-[0.98]">
+                                        <button type="submit" :disabled="rejecting"
+                                                class="inline-flex items-center gap-1.5 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-2 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed">
                                             <svg class="h-4 w-4 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
                                             </svg>
-                                            <span>Reject</span>
+                                            <span x-text="rejecting ? 'Rejecting…' : 'Reject'">Reject</span>
                                         </button>
                                     </form>
                                 @endif
@@ -127,6 +129,7 @@
                     </svg>
                 </div>
                 <input type="search" name="search" value="{{ request('search') }}" placeholder="Search by invoice number (e.g. EZ-202610-00042)…"
+                       @input.debounce.400ms="$el.form.requestSubmit()"
                        class="w-full rounded-xl border-0 bg-white/[0.04] py-2.5 pl-10 pr-4 text-sm text-white ring-1 ring-white/10 placeholder:text-slate-500 transition focus:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-amber-500/60">
             </div>
 
@@ -134,6 +137,7 @@
             <div class="flex flex-wrap items-center gap-3">
                 <div class="relative min-w-[140px]">
                     <select name="status"
+                            @change="$el.form.requestSubmit()"
                             class="w-full appearance-none rounded-xl border-0 bg-white/[0.04] py-2.5 pl-3.5 pr-8 text-sm text-white ring-1 ring-white/10 transition focus:bg-[#0e0e18] focus:outline-none focus:ring-2 focus:ring-amber-500/60">
                         <option value="" class="bg-[#0e0e18] text-white">Any status</option>
                         @foreach(['open', 'paid', 'void', 'uncollectible'] as $status)

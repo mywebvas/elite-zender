@@ -251,3 +251,31 @@ it('never shows another workspace an invoice', function (): void {
     $this->get(route('billing.invoices.show', $foreignInvoice->id))->assertNotFound();
     $this->post(route('billing.checkout.start', $foreignInvoice->id), ['gateway' => 'manual'])->assertNotFound();
 });
+
+it('optimizes uploaded bank transfer receipt images to webp and attaches proof path', function (): void {
+    Illuminate\Support\Facades\Storage::fake('local');
+
+    $invoice = $this->billing->invoiceForPlan($this->tenant, Plan::where('code', 'growth')->sole());
+    $payment = Payment::withoutGlobalScopes()->create([
+        'tenant_id' => $this->tenant->id,
+        'invoice_id' => $invoice->id,
+        'gateway' => 'manual',
+        'reference' => 'EZREF12345',
+        'status' => Payment::STATUS_PENDING,
+        'currency' => $invoice->currency,
+        'amount' => $invoice->total,
+    ]);
+
+    $file = Illuminate\Http\UploadedFile::fake()->image('transfer_receipt.jpg', 600, 400);
+
+    $this->post(route('billing.proof', $invoice->id), [
+        'reference' => 'EZREF12345',
+        'proof' => $file,
+    ])->assertRedirect()->assertSessionHas('success');
+
+    $freshPayment = $payment->fresh();
+    expect($freshPayment->proof_path)->not->toBeNull()
+        ->and($freshPayment->proof_path)->toEndWith('.webp');
+
+    Illuminate\Support\Facades\Storage::disk('local')->assertExists($freshPayment->proof_path);
+});

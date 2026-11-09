@@ -92,14 +92,16 @@
         <div class="flex items-center gap-1.5 shrink-0">
             @if($campaign->status === 'draft')
             <form action="{{ route('campaigns.dispatch', $campaign) }}" method="POST"
-                  onsubmit="return confirm('Send this campaign to all contacts in the selected list?')">
+                  x-data="{ sending: false }"
+                  @submit="if(sending){ $event.preventDefault(); return false; } if(!confirm('Send this campaign to all contacts in the selected list?')){ return false; } sending = true;">
                 @csrf
-                <button type="submit"
+                <button type="submit" :disabled="sending"
+                        :class="{ 'opacity-60 cursor-not-allowed': sending }"
                         class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 text-xs font-semibold hover:bg-emerald-100 dark:hover:bg-emerald-500/20 transition-colors">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
                     </svg>
-                    <span>Send</span>
+                    <span x-text="sending ? 'Sending...' : 'Send'">Send</span>
                 </button>
             </form>
             @endif

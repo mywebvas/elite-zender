@@ -8,11 +8,13 @@
                     <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                 </svg>
                 <input type="search" name="search" value="{{ $search }}" placeholder="Search by workspace name…"
+                       @input.debounce.400ms="$el.form.requestSubmit()"
                        class="w-full rounded-xl border-0 bg-white/[0.04] pl-10 pr-4 py-2.5 text-xs text-white ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500 transition">
             </div>
 
             <div class="flex items-center gap-2">
                 <select name="status"
+                        @change="$el.form.requestSubmit()"
                         class="rounded-xl border-0 bg-white/[0.04] px-3.5 py-2.5 text-xs font-medium text-white ring-1 ring-white/10 focus:ring-2 focus:ring-amber-500 transition">
                     <option value="" class="bg-[#0c0c16]">Any status</option>
                     <option value="active" @selected(request('status') === 'active') class="bg-[#0c0c16]">Active only</option>

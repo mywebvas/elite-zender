@@ -268,10 +268,11 @@
                                 Talk to sales
                             </x-button>
                         @else
-                            <form method="POST" action="{{ route('billing.subscribe') }}">
+                            <form method="POST" action="{{ route('billing.subscribe') }}"
+                                  x-data="{ subscribing: false }" @submit="if(subscribing){ $event.preventDefault(); return false; } subscribing = true">
                                 @csrf
                                 <input type="hidden" name="plan" value="{{ $plan->code }}">
-                                <x-button type="submit" :variant="$featured ? 'gradient' : 'secondary'" class="w-full justify-center">
+                                <x-button type="submit" ::disabled="subscribing" :variant="$featured ? 'gradient' : 'secondary'" class="w-full justify-center">
                                     @if($subscription === null || $price === 0)
                                         {{ $price === 0 ? 'Switch to Free' : 'Choose '.$plan->name }}
                                     @elseif($isUpgrade)

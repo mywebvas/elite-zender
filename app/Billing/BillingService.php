@@ -282,6 +282,61 @@ final class BillingService
     }
 
     /**
+     * Confirm an offline bank transfer without creating duplicate payment rows.
+     *
+     * Transitions the pending payment row directly to SUCCEEDED with the synthetic
+     * gateway_ref, settles the invoice, and announces the payment to the tenant.
+     */
+    public function confirmManualPayment(Payment $payment, int $amount, ?string $note = null, ?string $adminId = null): Payment
+    {
+        return DB::transaction(function () use ($payment, $amount, $note, $adminId): Payment {
+            $locked = Payment::withoutGlobalScopes()
+                ->whereKey($payment->getKey())
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if (! $locked->isAwaitingReview()) {
+                throw new RuntimeException('That payment is not awaiting review.');
+            }
+
+            $invoice = $locked->invoice;
+
+            if ($invoice === null) {
+                throw new RuntimeException('That payment has no invoice.');
+            }
+
+            $wasSuspended = Subscription::withoutGlobalScopes()
+                ->where('tenant_id', $invoice->tenant_id)
+                ->where('status', Subscription::STATUS_EXPIRED)
+                ->exists();
+
+            $payload = is_array($locked->payload) ? $locked->payload : [];
+            if ($adminId !== null) {
+                $payload['confirmed_by'] = $adminId;
+            }
+            if ($note !== null) {
+                $payload['note'] = $note;
+            }
+
+            $locked->forceFill([
+                'gateway_ref' => 'manual_'.$locked->getKey(),
+                'status' => Payment::STATUS_SUCCEEDED,
+                'amount' => $amount,
+                'payload' => $payload,
+                'reviewed_by' => $adminId,
+                'reviewed_at' => now(),
+                'paid_at' => now(),
+            ])->save();
+
+            $this->settle($invoice);
+
+            $this->acknowledgePayment($invoice->refresh(), $locked, $wasSuspended);
+
+            return $locked;
+        });
+    }
+
+    /**
      * Receipt, and — where it applies — the all-clear.
      *
      * Somebody who has just paid to end an outage wants one fact confirmed:

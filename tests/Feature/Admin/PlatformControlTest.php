@@ -617,3 +617,72 @@ it('reports every health probe without throwing when a dependency is down', func
     expect($heartbeat['status'])->toBe('fail')
         ->and($heartbeat['detail'])->toContain('heartbeat');
 });
+
+it('confirms a manual bank transfer without duplicating payment records and settles the invoice', function (): void {
+    $plan = Plan::where('code', 'starter')->sole();
+    $invoice = app(App\Billing\BillingService::class)->invoiceForPlan($this->tenant, $plan);
+
+    $payment = App\Models\Payment::withoutGlobalScopes()->create([
+        'tenant_id' => $this->tenant->id,
+        'invoice_id' => $invoice->id,
+        'gateway' => 'manual',
+        'reference' => 'EZCONFIRMTEST99',
+        'status' => App\Models\Payment::STATUS_PENDING,
+        'currency' => $invoice->currency,
+        'amount' => $invoice->total,
+        'proof_path' => 'payment-proofs/test.webp',
+    ]);
+
+    expect(App\Models\Payment::withoutGlobalScopes()->where('invoice_id', $invoice->id)->count())->toBe(1);
+
+    $this->actingAs($this->admin, 'admin')
+        ->post(route('admin.payments.confirm', $payment->id), [
+            'note' => 'Bank credit confirmed by finance team',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    // Exactly ONE payment row exists (not duplicated)
+    expect(App\Models\Payment::withoutGlobalScopes()->where('invoice_id', $invoice->id)->count())->toBe(1);
+
+    $freshPayment = $payment->fresh();
+    expect($freshPayment->status)->toBe(App\Models\Payment::STATUS_SUCCEEDED)
+        ->and($freshPayment->gateway_ref)->toBe('manual_'.$payment->id)
+        ->and($freshPayment->reviewed_by)->toBe($this->admin->id)
+        ->and($freshPayment->payload['note'])->toBe('Bank credit confirmed by finance team')
+        ->and($invoice->fresh()->isPaid())->toBeTrue()
+        ->and($invoice->fresh()->amount_paid)->toBe($invoice->total);
+
+    $activity = AdminActivity::where('action', 'payment.confirm_transfer')->sole();
+    expect($activity->admin_id)->toBe($this->admin->id)
+        ->and($activity->tenant_id)->toBe($this->tenant->id);
+});
+
+it('rejects a manual bank transfer receipt and records reason', function (): void {
+    $plan = Plan::where('code', 'starter')->sole();
+    $invoice = app(App\Billing\BillingService::class)->invoiceForPlan($this->tenant, $plan);
+
+    $payment = App\Models\Payment::withoutGlobalScopes()->create([
+        'tenant_id' => $this->tenant->id,
+        'invoice_id' => $invoice->id,
+        'gateway' => 'manual',
+        'reference' => 'EZREJECTTEST99',
+        'status' => App\Models\Payment::STATUS_PENDING,
+        'currency' => $invoice->currency,
+        'amount' => $invoice->total,
+    ]);
+
+    $this->actingAs($this->admin, 'admin')
+        ->post(route('admin.payments.reject', $payment->id), [
+            'reason' => 'Invalid transaction reference in statement',
+        ])
+        ->assertRedirect()
+        ->assertSessionHas('success');
+
+    expect($payment->fresh()->status)->toBe(App\Models\Payment::STATUS_FAILED)
+        ->and($payment->fresh()->failure_reason)->toBe('Invalid transaction reference in statement')
+        ->and($payment->fresh()->reviewed_by)->toBe($this->admin->id);
+
+    $activity = AdminActivity::where('action', 'payment.reject_transfer')->sole();
+    expect($activity->admin_id)->toBe($this->admin->id);
+});

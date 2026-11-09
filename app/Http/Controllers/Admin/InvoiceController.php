@@ -3,7 +3,6 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Billing\BillingService;
-use App\Billing\PaymentResult;
 use App\Http\Controllers\Controller;
 use App\Models\AdminActivity;
 use App\Models\Invoice;
@@ -61,23 +60,14 @@ class InvoiceController extends Controller
             'note' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $amount = $validated['amount'] ?? $payment->amount;
+        $amount = (int) ($validated['amount'] ?? $payment->amount);
 
-        $this->billing->recordPayment($payment->invoice, PaymentResult::success(
-            gateway: 'manual',
-            gatewayRef: 'manual_'.$payment->getKey(),
-            reference: $payment->reference,
-            amount: (int) $amount,
-            currency: $payment->currency,
-            raw: ['confirmed_by' => auth('admin')->id(), 'note' => $validated['note'] ?? null],
-        ));
-
-        $payment->forceFill([
-            'status' => Payment::STATUS_SUCCEEDED,
-            'reviewed_by' => auth('admin')->id(),
-            'reviewed_at' => now(),
-            'paid_at' => now(),
-        ])->save();
+        $this->billing->confirmManualPayment(
+            payment: $payment,
+            amount: $amount,
+            note: $validated['note'] ?? null,
+            adminId: auth('admin')->id(),
+        );
 
         $this->activity->record(
             action: 'payment.confirm_transfer',

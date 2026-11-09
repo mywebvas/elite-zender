@@ -42,6 +42,7 @@
                     </svg>
                 </div>
                 <input type="search" name="search" value="{{ $search }}" placeholder="Search by email address or full name…"
+                       @input.debounce.400ms="$el.form.requestSubmit()"
                        class="w-full rounded-xl border-0 bg-white/[0.04] py-2.5 pl-10 pr-4 text-sm text-white ring-1 ring-white/10 placeholder:text-slate-500 transition focus:bg-white/[0.07] focus:outline-none focus:ring-2 focus:ring-amber-500/60">
             </div>
 
@@ -49,6 +50,7 @@
             <div class="flex flex-wrap items-center gap-3">
                 <div class="relative min-w-[140px]">
                     <select name="role"
+                            @change="$el.form.requestSubmit()"
                             class="w-full appearance-none rounded-xl border-0 bg-white/[0.04] py-2.5 pl-3.5 pr-8 text-sm text-white ring-1 ring-white/10 transition focus:bg-[#0e0e18] focus:outline-none focus:ring-2 focus:ring-amber-500/60">
                         <option value="" class="bg-[#0e0e18] text-white">All roles</option>
                         @foreach($roles as $role)

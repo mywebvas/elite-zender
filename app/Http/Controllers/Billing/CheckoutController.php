@@ -7,6 +7,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Role;
+use App\Services\ImageOptimizer;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -39,6 +40,21 @@ class CheckoutController extends Controller
         }
 
         $gateway = $available[$validated['gateway']];
+
+        if ($gateway->key() === 'manual') {
+            $existingPending = Payment::withoutGlobalScopes()
+                ->where('invoice_id', $invoice->getKey())
+                ->where('gateway', 'manual')
+                ->where('status', Payment::STATUS_PENDING)
+                ->first();
+
+            if ($existingPending !== null) {
+                return redirect()
+                    ->route('billing.invoices.show', $invoice->id)
+                    ->with('bank_instructions', $gateway->checkout($invoice, '')->instructions)
+                    ->with('bank_reference', $existingPending->reference);
+            }
+        }
 
         try {
             $session = $gateway->checkout($invoice, route('billing.checkout.callback', $invoice->id));
@@ -87,10 +103,22 @@ class CheckoutController extends Controller
                 ->withErrors('We could not identify that payment. If you were charged, contact support.');
         }
 
+        // If the invoice is already paid, redirect safely without repeating gateway calls
+        if ($invoice->isPaid()) {
+            return redirect()->route('billing.index')->with('success', 'Payment received — thank you.');
+        }
+
         $attempt = Payment::withoutGlobalScopes()
             ->where('invoice_id', $invoice->getKey())
-            ->where('reference', $reference)
+            ->where(function ($q) use ($reference): void {
+                $q->where('reference', $reference)
+                    ->orWhere('gateway_ref', $reference);
+            })
             ->first();
+
+        if ($attempt !== null && $attempt->status === Payment::STATUS_SUCCEEDED) {
+            return redirect()->route('billing.index')->with('success', 'Payment received — thank you.');
+        }
 
         if ($attempt === null) {
             return redirect()->route('billing.invoices.show', $invoice->id)
@@ -133,26 +161,37 @@ class CheckoutController extends Controller
     }
 
     /** Upload proof of an offline bank transfer. */
-    public function uploadProof(Request $request, string $invoiceId): RedirectResponse
+    public function uploadProof(Request $request, string $invoiceId, ImageOptimizer $optimizer): RedirectResponse
     {
         $invoice = Invoice::findOrFail($invoiceId);
+
+        abort_if($invoice->isPaid(), 422, 'This invoice is already paid.');
 
         $validated = $request->validate([
             'reference' => ['required', 'string', 'max:64'],
             'proof' => ['required', 'file', 'mimes:jpg,jpeg,png,pdf', 'max:5120'],
         ]);
 
-        $path = $request->file('proof')->store('payment-proofs/'.$invoice->tenant_id, 'local');
+        /** @var \Illuminate\Http\UploadedFile $proofFile */
+        $proofFile = $request->file('proof');
+        $path = $optimizer->storeAndOptimize($proofFile, 'payment-proofs/'.$invoice->tenant_id, 'local');
 
-        Payment::withoutGlobalScopes()
+        $updated = Payment::withoutGlobalScopes()
             ->where('invoice_id', $invoice->getKey())
             ->where('reference', $validated['reference'])
             ->where('status', Payment::STATUS_PENDING)
             ->update(['proof_path' => $path, 'updated_at' => now()]);
 
+        if ($updated === 0) {
+            \Illuminate\Support\Facades\Storage::disk('local')->delete($path);
+
+            return back()->withErrors('No pending payment matching that reference was found.');
+        }
+
         Log::info('Bank transfer proof uploaded', [
             'invoice' => $invoice->number,
             'tenant_id' => $invoice->tenant_id,
+            'path' => $path,
         ]);
 
         return back()->with('success', 'Proof uploaded. We will confirm your payment shortly.');

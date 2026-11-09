@@ -115,7 +115,7 @@
                     <span class="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-500/15 text-indigo-400 text-xs font-bold">#</span>
                     <h2 class="text-xs font-bold uppercase tracking-wider text-slate-300">Subscriptions State</h2>
                 </div>
-                <span class="text-[10px] font-bold uppercase text-slate-500 tracking-wider">{{ $subscriptions->sum() }} Total</span>
+                <span class="text-[10px] font-bold uppercase text-slate-500 tracking-wider">{{ (is_object($subscriptions) && method_exists($subscriptions, 'sum')) ? $subscriptions->sum() : (is_array($subscriptions) ? array_sum($subscriptions) : 0) }} Total</span>
             </div>
 
             <div class="space-y-2.5">

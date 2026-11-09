@@ -13,6 +13,7 @@ use App\Models\Subscription;
 use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -27,16 +28,28 @@ class DashboardController extends Controller
 {
     public function __invoke(): View
     {
-        /** @var array{stats: array<string, int>, revenue: array<string, array{this_month: int, all_time: int}>, subscriptions: \Illuminate\Support\Collection<string, int>, planBreakdown: \Illuminate\Support\Collection<string, int>} $kpis */
+        // Purge legacy key if present to prevent incomplete class serialization issues
+        if (Cache::has('admin_dashboard_kpis')) {
+            Cache::forget('admin_dashboard_kpis');
+        }
+
+        /** @var array{stats: array<string, int>, revenue: array<string, array{this_month: int, all_time: int}>, subscriptions: array<string, int>|Collection<string, int>, planBreakdown: array<string, int>|Collection<string, int>} $kpis */
         $kpis = app()->environment('testing')
             ? $this->calculateKpis()
-            : Cache::remember('admin_dashboard_kpis', 30, fn () => $this->calculateKpis());
+            : Cache::remember('admin_dashboard_kpis_v2', 30, fn () => $this->calculateKpis());
+
+        // Defensive normalization: always ensure pure Collection instances for the view
+        $rawSubs = $kpis['subscriptions'] ?? [];
+        $subscriptions = $rawSubs instanceof Collection ? $rawSubs : collect(is_array($rawSubs) ? $rawSubs : []);
+
+        $rawPlans = $kpis['planBreakdown'] ?? [];
+        $planBreakdown = $rawPlans instanceof Collection ? $rawPlans : collect(is_array($rawPlans) ? $rawPlans : []);
 
         return view('admin.dashboard', [
             'stats' => $kpis['stats'],
             'revenue' => $kpis['revenue'],
-            'subscriptions' => $kpis['subscriptions'],
-            'planBreakdown' => $kpis['planBreakdown'],
+            'subscriptions' => $subscriptions,
+            'planBreakdown' => $planBreakdown,
             'awaitingReview' => Payment::withoutGlobalScopes()
                 ->with(['tenant:id,name', 'invoice:id,number,currency,total'])
                 ->where('gateway', 'manual')
@@ -68,8 +81,10 @@ class DashboardController extends Controller
 
     /**
      * Expensive platform aggregates, cached for 30 seconds in production.
+     * Caches raw primitive arrays rather than Collection objects to prevent
+     * incomplete class deserialization errors in persistent cache drivers.
      *
-     * @return array{stats: array<string, int>, revenue: array<string, array{this_month: int, all_time: int}>, subscriptions: \Illuminate\Support\Collection<string, int>, planBreakdown: \Illuminate\Support\Collection<string, int>}
+     * @return array{stats: array<string, int>, revenue: array<string, array{this_month: int, all_time: int}>, subscriptions: array<string, int>, planBreakdown: array<string, int>}
      */
     private function calculateKpis(): array
     {
@@ -86,13 +101,15 @@ class DashboardController extends Controller
             'subscriptions' => Subscription::withoutGlobalScopes()
                 ->selectRaw('status, count(*) as aggregate')
                 ->groupBy('status')
-                ->pluck('aggregate', 'status'),
+                ->pluck('aggregate', 'status')
+                ->all(),
             'planBreakdown' => DB::table('subscriptions')
                 ->join('plans', 'plans.id', '=', 'subscriptions.plan_id')
                 ->selectRaw('plans.name, count(*) as aggregate')
                 ->groupBy('plans.name')
                 ->orderByDesc('aggregate')
-                ->pluck('aggregate', 'plans.name'),
+                ->pluck('aggregate', 'plans.name')
+                ->all(),
         ];
     }
 

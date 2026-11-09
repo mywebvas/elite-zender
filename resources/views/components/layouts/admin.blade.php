@@ -4,7 +4,7 @@
 
     Visually distinct from the customer app on purpose — an operator who cannot
     instantly tell which surface they are on will eventually take a destructive
-    action in the wrong one. Amber and near-black, never the customer indigo.
+    action in the wrong one. Deep obsidian and 24K warm amber, never the customer indigo.
 --}}
 @php
     $admin = auth('admin')->user();
@@ -43,54 +43,70 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
     @stack('styles')
 </head>
-<body class="h-full bg-[#07070c] font-sans text-slate-100 antialiased"
-      x-data="{ mobileNav: false }">
+<body class="h-full bg-[#07070c] font-sans text-slate-100 antialiased selection:bg-amber-500/30 selection:text-amber-200"
+      x-data="{ mobileNav: false, commandOpen: false }">
 
 <a href="#admin-main"
-   class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-3 focus:left-3 focus:rounded-lg focus:bg-amber-500 focus:px-4 focus:py-2 focus:text-sm focus:font-semibold focus:text-slate-950">
+   class="sr-only focus:not-sr-only focus:absolute focus:z-50 focus:top-3 focus:left-3 focus:rounded-xl focus:bg-amber-500 focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-slate-950 shadow-lg">
     Skip to main content
 </a>
 
 <div class="flex min-h-full">
 
     {{-- ─────────────────── Sidebar ─────────────────── --}}
-    <aside class="fixed inset-y-0 left-0 z-40 w-64 flex-shrink-0 -translate-x-full flex-col border-r border-white/[0.07] bg-[#0b0b14] transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] lg:static lg:flex lg:translate-x-0"
+    <aside class="fixed inset-y-0 left-0 z-40 w-64 flex-shrink-0 -translate-x-full flex-col border-r border-white/[0.08] bg-[#0a0a12] transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] lg:static lg:flex lg:translate-x-0"
            :class="mobileNav ? 'translate-x-0 flex' : '-translate-x-full'">
 
-        <div class="flex h-16 flex-shrink-0 items-center gap-2.5 border-b border-white/[0.07] px-5">
-            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-amber-400 to-amber-600 shadow-[0_4px_12px_-4px_rgba(245,158,11,0.6)]">
-                <svg class="h-4 w-4 text-slate-950" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
-                </svg>
+        {{-- Brand / Header --}}
+        <div class="flex h-16 flex-shrink-0 items-center justify-between border-b border-white/[0.08] px-5">
+            <div class="flex items-center gap-3">
+                <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 shadow-[0_0_16px_-2px_rgba(245,158,11,0.5)]">
+                    <svg class="h-4 w-4 text-slate-950 font-black" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <p class="truncate text-sm font-bold tracking-tight text-white">{{ config('platform.name') }}</p>
+                    <div class="flex items-center gap-1.5">
+                        <span class="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse"></span>
+                        <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-amber-400">Operations</p>
+                    </div>
+                </div>
             </div>
-            <div class="min-w-0">
-                <p class="truncate text-sm font-semibold tracking-[-0.012em]">{{ config('platform.name') }}</p>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.1em] text-amber-500">Operations</p>
-            </div>
+
+            <button type="button" @click="mobileNav = false" class="p-1.5 text-slate-400 hover:text-white lg:hidden" aria-label="Close menu">
+                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
         </div>
 
-        <nav class="flex-1 space-y-5 overflow-y-auto p-3" aria-label="Operator navigation">
+        {{-- Navigation Menu --}}
+        <nav class="flex-1 space-y-6 overflow-y-auto px-3.5 py-4 scrollbar-thin" aria-label="Operator navigation">
             @foreach($nav as $section => $items)
                 @php
                     $visible = array_filter($items, fn ($i) => ! ($i['super'] ?? false) || $admin?->isSuperAdmin());
                 @endphp
                 @if($visible)
                     <div>
-                        <p class="px-3 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-slate-600">{{ $section }}</p>
-                        <div class="space-y-0.5">
+                        <p class="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-slate-500">{{ $section }}</p>
+                        <div class="space-y-1">
                             @foreach($visible as $item)
                                 @php $active = request()->routeIs($item['route']) || request()->routeIs(str_replace('.index', '.*', $item['route'])); @endphp
                                 <a href="{{ route($item['route']) }}"
                                    @class([
-                                       'group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors duration-150',
-                                       'bg-amber-500/[0.12] text-amber-400' => $active,
+                                       'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-xs font-semibold transition-all duration-150',
+                                       'bg-amber-500/[0.12] text-amber-300 shadow-[inset_0_1px_0_0_rgba(245,158,11,0.15)] ring-1 ring-amber-500/25' => $active,
                                        'text-slate-400 hover:bg-white/[0.04] hover:text-white' => ! $active,
                                    ])
                                    @if($active) aria-current="page" @endif>
-                                    <svg class="h-[18px] w-[18px] flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                                    <svg class="h-[18px] w-[18px] flex-shrink-0 transition-transform duration-150 group-hover:scale-110"
+                                         @class(['text-amber-400' => $active, 'text-slate-400 group-hover:text-white' => ! $active])
+                                         fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}"/>
                                     </svg>
-                                    {{ $item['label'] }}
+                                    <span class="truncate">{{ $item['label'] }}</span>
+                                    @if($active)
+                                        <span class="ml-auto h-1.5 w-1.5 rounded-full bg-amber-400 shadow-[0_0_6px_rgba(245,158,11,0.8)]"></span>
+                                    @endif
                                 </a>
                             @endforeach
                         </div>
@@ -99,109 +115,134 @@
             @endforeach
         </nav>
 
-        <div class="flex-shrink-0 border-t border-white/[0.07] p-3">
-            <div class="flex items-center gap-2.5 px-2 pb-2">
-                <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/[0.06] text-xs font-semibold">
+        {{-- Operator Profile Footer --}}
+        <div class="flex-shrink-0 border-t border-white/[0.08] bg-[#07070d]/60 p-3.5">
+            <div class="flex items-center gap-3 rounded-xl bg-white/[0.03] p-2.5 border border-white/[0.05]">
+                <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-700/20 text-xs font-bold text-amber-300 ring-1 ring-amber-500/30">
                     {{ Str::of($admin?->name ?? '?')->substr(0, 1)->upper() }}
                 </div>
-                <div class="min-w-0">
-                    <p class="truncate text-sm font-medium">{{ $admin?->name }}</p>
-                    <p class="truncate text-[11px] capitalize text-amber-500">{{ str_replace('_', ' ', $admin?->role ?? '') }}</p>
+                <div class="min-w-0 flex-1">
+                    <p class="truncate text-xs font-bold text-white">{{ $admin?->name }}</p>
+                    <p class="truncate text-[10px] font-semibold uppercase tracking-wider text-amber-400">{{ str_replace('_', ' ', $admin?->role ?? '') }}</p>
                 </div>
+                <form method="POST" action="{{ route('admin.logout') }}" class="flex-shrink-0">
+                    @csrf
+                    <button type="submit"
+                            title="Sign out of operator console"
+                            class="rounded-lg p-1.5 text-slate-400 transition hover:bg-white/10 hover:text-white">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
+                        </svg>
+                    </button>
+                </form>
             </div>
-            <form method="POST" action="{{ route('admin.logout') }}">
-                @csrf
-                <button type="submit" class="w-full rounded-lg px-3 py-2 text-left text-sm text-slate-400 transition-colors hover:bg-white/[0.04] hover:text-white">
-                    Sign out
-                </button>
-            </form>
         </div>
     </aside>
 
-    {{-- Mobile scrim --}}
-    <div x-show="mobileNav" x-cloak @click="mobileNav = false" x-transition.opacity
-         class="fixed inset-0 z-30 bg-black/60 backdrop-blur-sm lg:hidden"></div>
+    {{-- Mobile Scrim --}}
+    <div x-show="mobileNav" x-cloak @click="mobileNav = false"
+         x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-30 bg-black/80 backdrop-blur-sm lg:hidden"></div>
 
-    {{-- ─────────────────── Main ─────────────────── --}}
+    {{-- ─────────────────── Main Stage ─────────────────── --}}
     <div class="flex min-w-0 flex-1 flex-col">
-        <header class="sticky top-0 z-20 flex h-16 flex-shrink-0 items-center gap-3 border-b border-white/[0.07] bg-[#0b0b14]/90 px-4 backdrop-blur-xl lg:px-6">
-            <button type="button" @click="mobileNav = true"
-                    class="-ml-1 rounded-lg p-2 text-slate-400 hover:bg-white/5 hover:text-white lg:hidden"
-                    aria-label="Open navigation">
-                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
-            </button>
+        {{-- Top App Bar --}}
+        <header class="sticky top-0 z-20 flex h-16 flex-shrink-0 items-center justify-between gap-4 border-b border-white/[0.08] bg-[#090910]/85 px-4 backdrop-blur-2xl lg:px-8">
+            <div class="flex items-center gap-3 min-w-0">
+                <button type="button" @click="mobileNav = true"
+                        class="-ml-1.5 rounded-xl p-2 text-slate-400 hover:bg-white/[0.06] hover:text-white transition lg:hidden"
+                        aria-label="Open navigation">
+                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+                </button>
 
-            <div class="min-w-0 flex-1">
-                <h1 class="truncate text-[15px] font-semibold tracking-[-0.012em]">{{ $title ?? 'Operator console' }}</h1>
-                @if($subtitle)
-                    <p class="truncate text-xs text-slate-500">{{ $subtitle }}</p>
-                @endif
-            </div>
-
-            {{-- Global search. Support arrives with an email, a workspace name
-                 or an invoice number and should not have to guess which page. --}}
-            <div class="relative w-full max-w-xs"
-                 x-data="adminSearch()" @keydown.escape.window="close()" @click.outside="close()">
-                <label for="admin-search" class="sr-only">Search workspaces, users and invoices</label>
-                <svg class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
-                <input id="admin-search" type="search" x-model="term" @input.debounce.250ms="run()" @focus="run()"
-                       placeholder="Search…" autocomplete="off"
-                       class="w-full rounded-lg border-0 bg-white/[0.05] py-2 pl-9 pr-3 text-sm text-white ring-1 ring-white/10 placeholder:text-slate-500 focus:ring-2 focus:ring-amber-500">
-
-                <div x-show="open" x-cloak x-transition
-                     class="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-xl border border-white/10 bg-[#12121a] shadow-2xl">
-                    <template x-if="loading">
-                        <p class="px-4 py-3 text-xs text-slate-500">Searching…</p>
-                    </template>
-                    <template x-if="!loading && results.length === 0">
-                        <p class="px-4 py-3 text-xs text-slate-500">Nothing matched “<span x-text="term"></span>”.</p>
-                    </template>
-                    <template x-for="result in results" :key="result.url + result.label">
-                        <a :href="result.url" class="flex items-center justify-between gap-3 border-b border-white/5 px-4 py-2.5 text-sm transition hover:bg-white/5 last:border-0">
-                            <span class="min-w-0">
-                                <span class="block truncate font-medium" x-text="result.label"></span>
-                                <span class="block truncate text-xs text-slate-500" x-text="result.meta"></span>
-                            </span>
-                            <span class="flex-shrink-0 rounded bg-white/5 px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-400" x-text="result.type"></span>
-                        </a>
-                    </template>
+                <div class="min-w-0">
+                    <h1 class="truncate text-base font-extrabold tracking-tight text-white">{{ $title ?? 'Operator Console' }}</h1>
+                    @if($subtitle)
+                        <p class="truncate text-[11px] text-slate-400">{{ $subtitle }}</p>
+                    @endif
                 </div>
             </div>
 
-            <a href="{{ url('/') }}" class="hidden flex-shrink-0 text-xs font-medium text-slate-400 transition hover:text-white sm:block">
-                Customer app ↗
-            </a>
+            <div class="flex items-center gap-3">
+                {{-- Universal Command Trigger (Cmd+K) --}}
+                <button type="button"
+                        @click="commandOpen = true"
+                        class="flex items-center gap-2.5 rounded-xl border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs text-slate-400 transition hover:border-amber-500/40 hover:bg-white/[0.06] hover:text-slate-200 shadow-sm">
+                    <svg class="h-3.5 w-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                    </svg>
+                    <span class="hidden sm:inline">Search platform…</span>
+                    <span class="sm:hidden">Search</span>
+                    <kbd class="hidden rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-slate-400 sm:inline border border-white/[0.08]">⌘K</kbd>
+                </button>
+
+                {{-- Direct Link to Client App --}}
+                <a href="{{ url('/') }}"
+                   class="hidden items-center gap-1.5 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-1.5 text-xs font-semibold text-slate-400 transition hover:border-white/10 hover:bg-white/[0.05] hover:text-white md:inline-flex">
+                    <span>Customer app</span>
+                    <svg class="h-3 w-3 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+                    </svg>
+                </a>
+            </div>
         </header>
 
-        <main id="admin-main" class="flex-1 overflow-y-auto p-4 lg:p-6">
+        {{-- Main Content Canvas --}}
+        <main id="admin-main" class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+            {{-- Flash Feedback --}}
             @if (session('success'))
-                <div class="mb-4 rounded-xl border border-emerald-500/20 bg-emerald-500/[0.08] p-4" role="status">
-                    <p class="text-sm font-medium text-emerald-300">{{ session('success') }}</p>
+                <div class="mb-6 flex items-center justify-between gap-3 rounded-2xl border border-emerald-500/25 bg-emerald-500/[0.08] p-4 text-emerald-300 shadow-lg shadow-emerald-950/20" role="status" x-data="{ show: true }" x-show="show">
+                    <div class="flex items-center gap-3">
+                        <div class="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-500/20 text-emerald-300">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
+                        </div>
+                        <p class="text-xs font-semibold sm:text-sm">{{ session('success') }}</p>
+                    </div>
+                    <button type="button" @click="show = false" class="text-emerald-400/70 hover:text-emerald-300 p-1">
+                        <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                    </button>
                 </div>
             @endif
 
             @if ($errors->any())
-                <div class="mb-4 rounded-xl border border-rose-500/20 bg-rose-500/[0.08] p-4" role="alert">
-                    <ul class="space-y-1 text-sm text-rose-300">
-                        @foreach($errors->all() as $error)<li>{{ $error }}</li>@endforeach
-                    </ul>
+                <div class="mb-6 rounded-2xl border border-rose-500/30 bg-rose-500/[0.08] p-4 text-rose-300 shadow-lg shadow-rose-950/20" role="alert">
+                    <div class="flex items-start gap-3">
+                        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-xl bg-rose-500/20 text-rose-300">
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <p class="text-xs font-bold uppercase tracking-wider text-rose-400">Please review the following:</p>
+                            <ul class="mt-1 space-y-1 text-xs">
+                                @foreach($errors->all() as $error)<li>• {{ $error }}</li>@endforeach
+                            </ul>
+                        </div>
+                    </div>
                 </div>
             @endif
 
-            {{-- Secrets shown exactly once. Rendered here so every page that
-                 mints one gets identical, unmissable treatment. --}}
-            @foreach (['new_api_key' => 'API key', 'new_admin_password' => 'Temporary password', 'new_user_password' => 'Temporary password'] as $key => $label)
+            {{-- Secrets Reveal Banner (Once Only) --}}
+            @foreach (['new_api_key' => 'API Key', 'new_admin_password' => 'Temporary Operator Password', 'new_user_password' => 'Temporary User Password'] as $key => $label)
                 @if (session($key))
-                    <div class="mb-4 rounded-xl border-2 border-amber-500/40 bg-amber-500/[0.08] p-4" role="alert"
+                    <div class="mb-6 rounded-2xl border-2 border-amber-500/40 bg-gradient-to-r from-amber-500/[0.12] to-amber-600/[0.06] p-5 shadow-2xl shadow-amber-950/30" role="alert"
                          x-data="{ copied: false }">
-                        <p class="text-sm font-semibold text-amber-300">{{ $label }} — copy it now</p>
-                        <p class="mt-0.5 text-xs text-amber-200/70">This is the only time it will be shown. It is stored hashed and cannot be recovered.</p>
-                        <div class="mt-3 flex flex-wrap items-center gap-2">
-                            <code class="flex-1 select-all break-all rounded-lg bg-slate-950/70 px-3 py-2 font-mono text-sm text-amber-100">{{ session($key) }}</code>
+                        <div class="flex items-start justify-between gap-3">
+                            <div>
+                                <span class="inline-flex items-center gap-1.5 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-300">
+                                    Single-view secret
+                                </span>
+                                <p class="mt-2 text-sm font-extrabold text-white">{{ $label }} — copy it immediately</p>
+                                <p class="mt-0.5 text-xs text-amber-200/70">This secret is stored hashed and will never be displayed again.</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-3.5 flex flex-wrap items-center gap-2">
+                            <code class="flex-1 select-all break-all rounded-xl border border-white/10 bg-slate-950/80 px-4 py-2.5 font-mono text-xs font-bold text-amber-300">{{ session($key) }}</code>
                             <button type="button"
                                     @click="navigator.clipboard.writeText(@js(session($key))); copied = true; setTimeout(() => copied = false, 2000)"
-                                    class="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950 transition hover:bg-amber-400">
-                                <span x-text="copied ? 'Copied' : 'Copy'"></span>
+                                    class="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-4 py-2.5 text-xs font-bold text-slate-950 shadow-md transition hover:bg-amber-400 active:scale-95">
+                                <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                <span x-text="copied ? 'Copied to clipboard!' : 'Copy to clipboard'"></span>
                             </button>
                         </div>
                     </div>
@@ -213,29 +254,216 @@
     </div>
 </div>
 
+{{-- ─────────────────── Universal Command Bar Modal (Cmd+K) ─────────────────── --}}
+<div x-data="adminCommandPalette()"
+     x-show="commandOpen"
+     x-cloak
+     @keydown.window.prevent.cmd.k="commandOpen = true"
+     @keydown.window.prevent.ctrl.k="commandOpen = true"
+     @keydown.escape.window="close()"
+     class="relative z-50"
+     role="dialog" aria-modal="true">
+
+    {{-- Backdrop --}}
+    <div x-show="commandOpen"
+         x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0" x-transition:enter-end="opacity-100"
+         x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100" x-transition:leave-end="opacity-0"
+         class="fixed inset-0 bg-black/80 backdrop-blur-md transition-opacity"
+         @click="close()"></div>
+
+    <div class="fixed inset-0 z-10 overflow-y-auto p-4 sm:p-6 md:p-20">
+        <div x-show="commandOpen"
+             x-transition:enter="ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100"
+             x-transition:leave="ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+             @click.outside="close()"
+             class="mx-auto max-w-xl transform overflow-hidden rounded-2xl border border-white/[0.1] bg-[#0c0c16] shadow-2xl shadow-black/80 transition-all">
+
+            {{-- Search Input --}}
+            <div class="relative border-b border-white/[0.08]">
+                <svg class="pointer-events-none absolute left-4 top-4 h-5 w-5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                <input type="text"
+                       x-ref="searchInput"
+                       x-model="term"
+                       @input.debounce.200ms="run()"
+                       @keydown.arrow-down.prevent="selectNext()"
+                       @keydown.arrow-up.prevent="selectPrev()"
+                       @keydown.enter.prevent="executeSelected()"
+                       placeholder="Search workspaces, customer emails, invoices..."
+                       class="h-13 w-full border-0 bg-transparent pl-12 pr-10 text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-0">
+                <button type="button" @click="close()" class="absolute right-3.5 top-3.5 rounded-lg p-1 text-slate-500 hover:text-slate-300">
+                    <kbd class="rounded bg-white/[0.06] px-1.5 py-0.5 font-mono text-[10px] text-slate-400">ESC</kbd>
+                </button>
+            </div>
+
+            {{-- Filter Category Pills --}}
+            <div class="flex items-center gap-1.5 border-b border-white/[0.06] bg-white/[0.02] px-4 py-2 text-xs">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 mr-1">Filter:</span>
+                <button type="button" @click="filter = 'all'; run()"
+                        :class="filter === 'all' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'text-slate-400 hover:bg-white/[0.04] border-transparent'"
+                        class="rounded-lg border px-2 py-0.5 text-[11px] font-semibold transition">All</button>
+                <button type="button" @click="filter = 'workspace'; run()"
+                        :class="filter === 'workspace' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'text-slate-400 hover:bg-white/[0.04] border-transparent'"
+                        class="rounded-lg border px-2 py-0.5 text-[11px] font-semibold transition">Workspaces</button>
+                <button type="button" @click="filter = 'user'; run()"
+                        :class="filter === 'user' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'text-slate-400 hover:bg-white/[0.04] border-transparent'"
+                        class="rounded-lg border px-2 py-0.5 text-[11px] font-semibold transition">Users</button>
+                <button type="button" @click="filter = 'invoice'; run()"
+                        :class="filter === 'invoice' ? 'bg-amber-500/20 text-amber-300 border-amber-500/30' : 'text-slate-400 hover:bg-white/[0.04] border-transparent'"
+                        class="rounded-lg border px-2 py-0.5 text-[11px] font-semibold transition">Invoices</button>
+            </div>
+
+            {{-- Results Stage --}}
+            <div class="max-h-80 overflow-y-auto p-2 scrollbar-thin">
+                <template x-if="loading">
+                    <div class="flex items-center justify-center py-8 text-xs text-slate-400 gap-2">
+                        <svg class="h-4 w-4 animate-spin text-amber-400" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path>
+                        </svg>
+                        <span>Scanning platform database…</span>
+                    </div>
+                </template>
+
+                <template x-if="!loading && results.length === 0 && term.trim().length >= 2">
+                    <div class="py-8 text-center text-xs text-slate-500">
+                        <p class="font-medium text-slate-400">No matching records found</p>
+                        <p class="mt-1">Try another keyword, email domain, or invoice prefix.</p>
+                    </div>
+                </template>
+
+                <template x-if="!loading && term.trim().length < 2">
+                    <div class="p-4 text-xs text-slate-500">
+                        <p class="font-semibold text-slate-400 uppercase tracking-wider text-[10px] mb-2">Quick Navigation</p>
+                        <div class="grid grid-cols-2 gap-1.5">
+                            <a href="{{ route('admin.dashboard') }}" class="flex items-center gap-2 rounded-xl p-2 text-slate-300 hover:bg-white/[0.04] transition">
+                                <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                                <span>Overview Dashboard</span>
+                            </a>
+                            <a href="{{ route('admin.system.index') }}" class="flex items-center gap-2 rounded-xl p-2 text-slate-300 hover:bg-white/[0.04] transition">
+                                <span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+                                <span>System Health & Queues</span>
+                            </a>
+                            <a href="{{ route('admin.tenants.index') }}" class="flex items-center gap-2 rounded-xl p-2 text-slate-300 hover:bg-white/[0.04] transition">
+                                <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                                <span>All Workspaces</span>
+                            </a>
+                            <a href="{{ route('admin.invoices.index') }}" class="flex items-center gap-2 rounded-xl p-2 text-slate-300 hover:bg-white/[0.04] transition">
+                                <span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+                                <span>Billing & Wire Reviews</span>
+                            </a>
+                        </div>
+                    </div>
+                </template>
+
+                <div class="space-y-1">
+                    <template x-for="(result, index) in filteredResults()" :key="result.url + result.label">
+                        <a :href="result.url"
+                           @mouseenter="selectedIndex = index"
+                           :class="selectedIndex === index ? 'bg-amber-500/[0.12] ring-1 ring-amber-500/30 text-white' : 'hover:bg-white/[0.04] text-slate-300'"
+                           class="flex items-center justify-between gap-3 rounded-xl px-3.5 py-2.5 text-xs transition">
+                            <div class="min-w-0 flex items-center gap-3">
+                                <div :class="{
+                                        'bg-amber-500/20 text-amber-400': result.type === 'Workspace',
+                                        'bg-indigo-500/20 text-indigo-400': result.type === 'User',
+                                        'bg-emerald-500/20 text-emerald-400': result.type === 'Invoice'
+                                     }"
+                                     class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg text-[10px] font-bold">
+                                    <span x-text="result.type.substring(0, 1)"></span>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="truncate font-bold text-white" x-text="result.label"></p>
+                                    <p class="truncate text-[11px] text-slate-400" x-text="result.meta"></p>
+                                </div>
+                            </div>
+                            <span class="rounded bg-white/[0.06] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-400" x-text="result.type"></span>
+                        </a>
+                    </template>
+                </div>
+            </div>
+
+            {{-- Footer Command Info --}}
+            <div class="flex items-center justify-between border-t border-white/[0.06] bg-white/[0.02] px-4 py-2.5 text-[11px] text-slate-500">
+                <div class="flex items-center gap-3">
+                    <span><kbd class="font-mono text-slate-400">↑↓</kbd> to navigate</span>
+                    <span><kbd class="font-mono text-slate-400">↵</kbd> to select</span>
+                    <span><kbd class="font-mono text-slate-400">ESC</kbd> to exit</span>
+                </div>
+                <span class="text-amber-400 font-semibold">Elite Operations</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- Universal Confirmation Modal --}}
+<x-admin.confirm-modal />
+
 @push('scripts')
 <script nonce="{{ $cspNonce ?? '' }}">
-    window.adminSearchData = () => ({
-        term: '', results: [], open: false, loading: false,
+    window.confirmAction = (options) => {
+        window.dispatchEvent(new CustomEvent('open-confirm-modal', { detail: options }));
+    };
+
+    window.adminCommandPalette = () => ({
+        term: '',
+        results: [],
+        filter: 'all',
+        loading: false,
+        selectedIndex: 0,
+        init() {
+            this.$watch('commandOpen', (value) => {
+                if (value) {
+                    this.term = '';
+                    this.results = [];
+                    this.selectedIndex = 0;
+                    setTimeout(() => this.$refs.searchInput?.focus(), 50);
+                }
+            });
+        },
         async run() {
-            if (this.term.trim().length < 2) { this.open = false; this.results = []; return; }
-            this.open = true;
+            if (this.term.trim().length < 2) {
+                this.results = [];
+                return;
+            }
             this.loading = true;
             try {
                 const response = await fetch(@js(route('admin.search')) + '?q=' + encodeURIComponent(this.term), {
                     headers: { Accept: 'application/json' },
                 });
-                this.results = (await response.json()).data ?? [];
-            } catch (error) {
+                const json = await response.json();
+                this.results = json.data ?? [];
+                this.selectedIndex = 0;
+            } catch (err) {
                 this.results = [];
             } finally {
                 this.loading = false;
             }
         },
-        close() { this.open = false; },
+        filteredResults() {
+            if (this.filter === 'all') return this.results;
+            return this.results.filter(r => r.type.toLowerCase() === this.filter);
+        },
+        selectNext() {
+            const list = this.filteredResults();
+            if (list.length === 0) return;
+            this.selectedIndex = (this.selectedIndex + 1) % list.length;
+        },
+        selectPrev() {
+            const list = this.filteredResults();
+            if (list.length === 0) return;
+            this.selectedIndex = (this.selectedIndex - 1 + list.length) % list.length;
+        },
+        executeSelected() {
+            const list = this.filteredResults();
+            if (list[this.selectedIndex]) {
+                window.location.href = list[this.selectedIndex].url;
+            }
+        },
+        close() {
+            this.commandOpen = false;
+        }
     });
-    document.addEventListener('alpine:init', () => Alpine.data('adminSearch', window.adminSearchData));
-    if (window.Alpine) window.Alpine.data('adminSearch', window.adminSearchData);
 </script>
 @endpush
 

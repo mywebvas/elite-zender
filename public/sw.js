@@ -3,7 +3,7 @@
  * Fully Optimized Premium PWA Implementation
  */
 
-const CACHE_NAME = 'elitesender-premium-v2';
+const CACHE_NAME = 'elitesender-v3-20261015101141';
 const OFFLINE_URL = '/offline';
 const CACHE_EXTENSIONS = ['.css', '.js', '.woff2', '.png', '.svg', '.webp', '.jpg'];
 

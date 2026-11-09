@@ -45,8 +45,21 @@ fix.php
 fix_utf8.php
 
 
+# Specimen reference codebase
+/specimen1/
+
 # PHPStan / build artefacts
 /build
+
+# Agent / IDE / Prototyping scratch files
+/.agents/
+/.claude/
+/.mcp.json
+/boost.json
+/gitme.txt
+/opencode.json
+/stitch_composer.html
+/stitch_dashboard.html
 
 # Stray test output
 test_out.txt

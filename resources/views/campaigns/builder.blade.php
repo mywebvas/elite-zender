@@ -13,49 +13,49 @@
         <div class="px-6 py-3 border-b border-slate-200 dark:border-white/[0.08] bg-white/80 dark:bg-[#0A0A0A]/80 backdrop-blur-md flex-shrink-0">
             <div class="max-w-[1600px] mx-auto grid grid-cols-2 md:grid-cols-4 gap-3">
                 {{-- Step 1 --}}
-                <div class="flex items-center gap-3">
+                <button type="button" @click="goToStep(1)" class="flex items-center gap-3 text-left group transition-opacity hover:opacity-100">
                     <div class="w-6 h-6 rounded-full bg-emerald-500/20 border border-emerald-500 text-emerald-500 flex items-center justify-center shrink-0">
                         <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>
                     </div>
                     <div class="min-w-0">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-500 block">Step 1</span>
-                        <span class="text-xs font-semibold text-slate-900 dark:text-white truncate block">Details & Audience</span>
+                        <span class="text-xs font-semibold text-slate-900 dark:text-white truncate block group-hover:text-indigo-500">Details & Audience</span>
                     </div>
-                </div>
+                </button>
 
                 {{-- Step 2 --}}
-                <div class="flex items-center gap-3">
+                <button type="button" @click="goToStep(2)" class="flex items-center gap-3 text-left group transition-opacity hover:opacity-100">
                     <div class="w-6 h-6 rounded-full bg-indigo-500/20 border border-indigo-500 text-indigo-500 flex items-center justify-center shrink-0 relative">
                         <span class="animate-ping absolute inset-0 rounded-full bg-indigo-500 opacity-30"></span>
                         <span class="text-xs font-bold text-indigo-600 dark:text-indigo-400 relative">2</span>
                     </div>
                     <div class="min-w-0">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400 block">Step 2 • Active</span>
-                        <span class="text-xs font-semibold text-slate-900 dark:text-white truncate block">Composer & Preview</span>
+                        <span class="text-xs font-semibold text-slate-900 dark:text-white truncate block group-hover:text-indigo-500">Composer & Preview</span>
                     </div>
-                </div>
+                </button>
 
                 {{-- Step 3 --}}
-                <div class="flex items-center gap-3 opacity-60">
+                <button type="button" @click="goToStep(3)" class="flex items-center gap-3 text-left group transition-opacity opacity-70 hover:opacity-100">
                     <div class="w-6 h-6 rounded-full border border-slate-300 dark:border-white/20 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
                         3
                     </div>
                     <div class="min-w-0">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Step 3</span>
-                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate block">SMTP Pool Allocation</span>
+                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate block group-hover:text-indigo-500">SMTP Allocation</span>
                     </div>
-                </div>
+                </button>
 
                 {{-- Step 4 --}}
-                <div class="flex items-center gap-3 opacity-60">
+                <button type="button" @click="goToStep(4)" class="flex items-center gap-3 text-left group transition-opacity opacity-70 hover:opacity-100">
                     <div class="w-6 h-6 rounded-full border border-slate-300 dark:border-white/20 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
                         4
                     </div>
                     <div class="min-w-0">
                         <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">Step 4</span>
-                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate block">Pre-Flight Review</span>
+                        <span class="text-xs font-semibold text-slate-600 dark:text-slate-400 truncate block group-hover:text-indigo-500">Pre-Flight Review</span>
                     </div>
-                </div>
+                </button>
             </div>
         </div>
 
@@ -351,6 +351,13 @@
                     },
                 });
 
+                // Dock Quill's generated toolbar into #quill-toolbar above the editor
+                const toolbar = this.$refs.editor.previousElementSibling;
+                if (toolbar && toolbar.classList.contains('ql-toolbar')) {
+                    const host = document.getElementById('quill-toolbar');
+                    if (host) host.appendChild(toolbar);
+                }
+
                 if (this.$refs.editorHtml.value) {
                     this.quill.root.innerHTML = this.$refs.editorHtml.value;
                 }
@@ -361,7 +368,7 @@
             },
 
             handleImage() {
-                const url = prompt('Enter image URL:');
+                const url = prompt('Image URL (must be publicly reachable):');
                 if (url && this.quill) {
                     const range = this.quill.getSelection(true);
                     this.quill.insertEmbed(range.index, 'image', url);
@@ -370,7 +377,23 @@
 
             syncEditor() {
                 if (this.quill && this.$refs.editorHtml) {
-                    this.$refs.editorHtml.value = this.quill.root.innerHTML;
+                    const html = this.quill.root.innerHTML;
+                    this.$refs.editorHtml.value = html === '<p><br></p>' ? '' : html;
+                }
+                return true;
+            },
+
+            goToStep(step) {
+                if (step === 1) {
+                    document.getElementById('name')?.focus();
+                } else if (step === 2) {
+                    this.mode = 'design';
+                    this.$nextTick(() => this.quill?.focus());
+                } else if (step === 3) {
+                    document.getElementById('smtp')?.focus();
+                } else if (step === 4) {
+                    this.mode = 'preview';
+                    this.refreshPreview();
                 }
             },
 

@@ -5,6 +5,7 @@ namespace App\Jobs;
 use App\Models\Tenant;
 use App\Services\BounceProcessor;
 use App\Tenancy\TenantContext;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Support\Facades\Crypt;
@@ -18,7 +19,7 @@ use Illuminate\Support\Facades\Log;
  * wrote "Scanning for bounces..." to the log and returned, which looked
  * healthy on every dashboard while no bounce was ever processed.
  */
-class CheckImapBouncesJob implements ShouldQueue
+class CheckImapBouncesJob implements ShouldBeUnique, ShouldQueue
 {
     use Queueable;
 
@@ -34,6 +35,11 @@ class CheckImapBouncesJob implements ShouldQueue
         $this->onQueue('low');
     }
 
+    public function uniqueId(): string
+    {
+        return $this->tenantId;
+    }
+
     public function handle(BounceProcessor $processor): void
     {
         $tenant = Tenant::find($this->tenantId);
@@ -46,6 +52,15 @@ class CheckImapBouncesJob implements ShouldQueue
 
         if (! is_array($config) || empty($config['host']) || empty($config['username'])) {
             // Nothing configured for this workspace — not an error.
+            return;
+        }
+
+        if (! \App\Support\SafeHost::isSafe((string) $config['host'])) {
+            Log::warning('CheckImapBouncesJob: IMAP host is prohibited or invalid', [
+                'tenant_id' => $this->tenantId,
+                'host' => $config['host'],
+            ]);
+
             return;
         }
 

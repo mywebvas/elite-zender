@@ -105,8 +105,8 @@
     </div>
 
     {{-- Content Preview --}}
-    <div class="card overflow-hidden flex flex-col lg:flex-row h-[600px]">
-        <div class="w-full lg:w-1/3 bg-slate-50 dark:bg-[#0a0a0f] border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/10 p-6 overflow-y-auto">
+    <div class="card overflow-hidden flex flex-col lg:flex-row min-h-[500px]">
+        <div class="w-full lg:w-1/3 bg-slate-50 dark:bg-white/[0.02] border-b lg:border-b-0 lg:border-r border-slate-200 dark:border-white/[0.06] p-6 overflow-y-auto">
             <h3 class="text-base font-bold text-slate-900 dark:text-white mb-6">Delivery Details</h3>
             
             <div class="space-y-6">

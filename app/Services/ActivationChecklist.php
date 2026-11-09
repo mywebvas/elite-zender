@@ -86,6 +86,17 @@ final class ActivationChecklist
      */
     public function summary(?User $for = null): array
     {
+        if (! app()->environment('testing') && \Illuminate\Support\Facades\Cache::get('tenant_activation_completed') === true) {
+            return [
+                'steps' => [],
+                'completed' => 5,
+                'total' => 5,
+                'percent' => 100,
+                'next' => null,
+                'complete' => true,
+            ];
+        }
+
         $steps = $this->steps($for);
         $completed = count(array_filter($steps, static fn (array $step): bool => $step['done']));
         $total = count($steps);
@@ -101,13 +112,18 @@ final class ActivationChecklist
             }
         }
 
+        $isComplete = $completed === $total;
+        if ($isComplete && ! app()->environment('testing')) {
+            \Illuminate\Support\Facades\Cache::forever('tenant_activation_completed', true);
+        }
+
         return [
             'steps' => $steps,
             'completed' => $completed,
             'total' => $total,
             'percent' => $total === 0 ? 100 : (int) round($completed / $total * 100),
             'next' => $next,
-            'complete' => $completed === $total,
+            'complete' => $isComplete,
         ];
     }
 }

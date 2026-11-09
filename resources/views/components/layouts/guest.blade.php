@@ -84,18 +84,18 @@
                 </div>
             </div>
 
-            {{-- Social proof --}}
-            <div class="flex items-center gap-4 pt-6 border-t border-white/10">
-                <div class="flex -space-x-2">
-                    @foreach(['J','M','S','A','K'] as $i => $l)
-                    <div class="w-8 h-8 rounded-full border-2 border-[#0a0a16] flex items-center justify-center text-[10px] font-bold text-white"
-                         style="background: {{ ['#4f46e5','#7c3aed','#059669','#d97706','#0284c7'][$i] }};">{{ $l }}</div>
-                    @endforeach
+            {{-- Platform trust guarantees --}}
+            <div class="flex items-center gap-3 pt-6 border-t border-white/10 text-xs text-slate-400">
+                <div class="flex items-center gap-1.5">
+                    <svg class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/>
+                    </svg>
+                    <span class="text-slate-300 font-medium">Bank-grade isolation</span>
                 </div>
-                <div>
-                    <div class="flex text-amber-400 text-sm">★★★★★</div>
-                    <p class="text-slate-500 text-xs mt-0.5">Trusted by 2,400+ marketers</p>
-                </div>
+                <span class="text-slate-600">·</span>
+                <span>Own relays</span>
+                <span class="text-slate-600">·</span>
+                <span>Zero vendor lock-in</span>
             </div>
         </div>
     </div>

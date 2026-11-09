@@ -114,3 +114,29 @@ it('still scopes the SPA cookie path', function (): void {
             'data',
         );
 });
+
+it('exposes opens and clicks metrics in the campaign resource', function (): void {
+    $campaign = Campaign::factory()->create(['tenant_id' => $this->mine->tenant_id]);
+    $contact = Contact::factory()->create(['tenant_id' => $this->mine->tenant_id]);
+
+    App\Models\CampaignEvent::create([
+        'tenant_id' => $this->mine->tenant_id,
+        'campaign_id' => $campaign->id,
+        'contact_id' => $contact->id,
+        'type' => App\Models\CampaignEvent::TYPE_OPEN,
+    ]);
+
+    App\Models\CampaignEvent::create([
+        'tenant_id' => $this->mine->tenant_id,
+        'campaign_id' => $campaign->id,
+        'contact_id' => $contact->id,
+        'type' => App\Models\CampaignEvent::TYPE_CLICK,
+    ]);
+
+    $response = $this->withHeaders(tokenHeaders($this->mine))
+        ->getJson("/api/v1/campaigns/{$campaign->id}");
+
+    $response->assertOk()
+        ->assertJsonPath('data.metrics.opens', 1)
+        ->assertJsonPath('data.metrics.clicks', 1);
+});

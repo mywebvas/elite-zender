@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\SmtpAccount;
+use Closure;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -20,7 +21,16 @@ class StoreSmtpAccountRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'host' => ['required', 'string', 'max:255'],
+            'host' => [
+                'required',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! is_string($value) || ! \App\Support\SafeHost::isSafe($value)) {
+                        $fail('The host address is invalid or prohibited.');
+                    }
+                },
+            ],
             'port' => ['required', 'integer', 'min:1', 'max:65535'],
             'username' => ['nullable', 'string', 'max:255'],
             // Long passphrases and provider API keys routinely exceed 255

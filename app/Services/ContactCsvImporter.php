@@ -156,16 +156,14 @@ final class ContactCsvImporter
                 $created++;
             }
 
-            if ($listId !== null) {
-                // One pivot write for the whole batch instead of N round-trips.
-                /** @var \Illuminate\Database\Eloquent\Collection<int, Contact> $contacts */
-                $contacts = Contact::withTrashed()
-                    ->whereKey($existing->values()->all())
-                    ->get();
+            if ($listId !== null && $existing->isNotEmpty()) {
+                // One pivot bulk insert for the whole batch instead of N round-trips.
+                $pivotRows = $existing->values()->map(static fn ($contactId): array => [
+                    'contact_id' => $contactId,
+                    'contact_list_id' => $listId,
+                ])->all();
 
-                foreach ($contacts as $contact) {
-                    $contact->lists()->syncWithoutDetaching([$listId]);
-                }
+                DB::table('contact_contact_list')->upsert($pivotRows, ['contact_id', 'contact_list_id']);
             }
 
             return [$created, count($batch) - $created];

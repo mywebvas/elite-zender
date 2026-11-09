@@ -38,24 +38,30 @@ class TeamController extends Controller
 
         $tenant = $this->tenant();
 
+        $members = User::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->getKey())
+            ->orderByRaw(sprintf(
+                "case role when '%s' then 0 when '%s' then 1 when '%s' then 2 else 3 end",
+                Role::OWNER, Role::ADMIN, Role::MEMBER,
+            ))
+            ->orderBy('name')
+            ->get();
+
+        $invitations = Invitation::withoutGlobalScopes()
+            ->where('tenant_id', $tenant->getKey())
+            ->whereNull('accepted_at')
+            ->latest()
+            ->get();
+
+        $usedSeats = $members->count() + $invitations->count();
+
         return view('team.index', [
-            'members' => User::withoutGlobalScopes()
-                ->where('tenant_id', $tenant->getKey())
-                ->orderByRaw(sprintf(
-                    "case role when '%s' then 0 when '%s' then 1 when '%s' then 2 else 3 end",
-                    Role::OWNER, Role::ADMIN, Role::MEMBER,
-                ))
-                ->orderBy('name')
-                ->get(),
-            'invitations' => Invitation::withoutGlobalScopes()
-                ->where('tenant_id', $tenant->getKey())
-                ->whereNull('accepted_at')
-                ->latest()
-                ->get(),
+            'members' => $members,
+            'invitations' => $invitations,
             'seats' => [
-                'used' => $this->seats->used($tenant),
+                'used' => $usedSeats,
                 'limit' => $this->seats->limit($tenant),
-                'remaining' => $this->seats->remaining($tenant),
+                'remaining' => $this->seats->remaining($tenant, $usedSeats),
             ],
             'roles' => $this->assignableRoles(),
         ]);

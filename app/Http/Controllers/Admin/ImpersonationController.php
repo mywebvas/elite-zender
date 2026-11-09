@@ -75,7 +75,7 @@ class ImpersonationController extends Controller
     public function stop(Request $request): RedirectResponse
     {
         $id = $request->session()->pull('impersonation.id');
-        $request->session()->forget('impersonation.tenant_id');
+        $tenantId = $request->session()->pull('impersonation.tenant_id');
 
         if ($id !== null) {
             AdminImpersonation::whereKey($id)->update(['ended_at' => now()]);
@@ -83,7 +83,7 @@ class ImpersonationController extends Controller
             app(ActivityLogger::class)->record(
                 action: 'impersonation.stop',
                 description: 'Ended an impersonation session',
-                tenantId: $request->session()->get('impersonation.tenant_id'),
+                tenantId: is_string($tenantId) ? $tenantId : null,
                 severity: AdminActivity::SEVERITY_NOTICE,
             );
         }

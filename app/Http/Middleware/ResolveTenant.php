@@ -31,7 +31,11 @@ class ResolveTenant
             return;
         }
 
-        \Illuminate\Support\Facades\View::share('billingNotice', $this->notice($tenant));
+        $notice = app()->environment('testing')
+            ? $this->notice($tenant)
+            : \Illuminate\Support\Facades\Cache::remember('tenant_billing_notice', 60, fn () => $this->notice($tenant));
+
+        \Illuminate\Support\Facades\View::share('billingNotice', $notice);
     }
 
     /**

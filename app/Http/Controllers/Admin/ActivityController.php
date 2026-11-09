@@ -40,7 +40,7 @@ class ActivityController extends Controller
             // Chunked so exporting a year of history does not exhaust memory.
             $this->query($request)->chunk(500, function ($rows) use ($out): void {
                 foreach ($rows as $row) {
-                    fputcsv($out, [
+                    fputcsv($out, \App\Support\CsvSanitizer::sanitizeRow([
                         $row->created_at?->toIso8601String(),
                         $row->admin_email,
                         $row->action,
@@ -49,7 +49,7 @@ class ActivityController extends Controller
                         $row->tenant?->name,
                         $row->reason,
                         $row->ip_address,
-                    ]);
+                    ]));
                 }
             });
 

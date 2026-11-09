@@ -95,6 +95,17 @@ class SmtpAccountController extends Controller
 
         $this->authorize('update', $account);
 
+        if (! \App\Support\SafeHost::isSafe((string) $account->host)) {
+            $account->forceFill([
+                'status' => SmtpAccount::STATUS_ERROR,
+                'last_checked_at' => now(),
+            ])->save();
+
+            return back()->withErrors([
+                'smtp' => sprintf('%s refused the connection: host is prohibited.', $account->name),
+            ]);
+        }
+
         $transport = new EsmtpTransport(
             host: (string) $account->host,
             port: (int) $account->port,

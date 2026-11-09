@@ -35,6 +35,10 @@ class SecurityAlert extends LifecycleNotification
     ) {
         parent::__construct();
 
+        // Security alerts are urgent: dispatch on high lane so bulk imports
+        // or exports on the low lane cannot delay an account takeover warning.
+        $this->onQueue('high');
+
         // Captured at construction: the queued job runs outside the request
         // that caused it, so there is no client IP to read by then.
         $this->context = [

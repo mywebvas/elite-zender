@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Requests\UpdateWorkspaceSettingsRequest;
 use App\Tenancy\TenantContext;
+use Closure;
 use DateTimeZone;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
@@ -89,7 +90,16 @@ class SettingsController extends Controller
         }
 
         $validated = $request->validate([
-            'host' => ['required', 'string', 'max:255'],
+            'host' => [
+                'required',
+                'string',
+                'max:255',
+                function (string $attribute, mixed $value, Closure $fail): void {
+                    if (! is_string($value) || ! \App\Support\SafeHost::isSafe($value)) {
+                        $fail('The host address is invalid or prohibited.');
+                    }
+                },
+            ],
             'port' => ['required', 'integer', 'min:1', 'max:65535'],
             'username' => ['required', 'string', 'max:255'],
             // Blank means "leave it alone", never "erase it" — the field

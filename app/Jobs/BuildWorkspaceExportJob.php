@@ -109,75 +109,113 @@ class BuildWorkspaceExportJob implements ShouldQueue
         $zip->addFromString('README.txt', $this->readme($tenant));
         $zip->addFromString('workspace.json', (string) json_encode($this->workspace($tenant), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES));
 
-        $zip->addFromString('contacts.csv', $this->csv(
-            ['email', 'first_name', 'last_name', 'status', 'custom_fields', 'created_at'],
-            Contact::withTrashed()->orderBy('id'),
-            fn (Contact $c): array => [
-                $c->email, $c->first_name, $c->last_name, $c->status,
-                json_encode($c->custom_fields ?: new stdClass),
-                $c->created_at?->toIso8601String(),
-            ],
-        ));
+        /** @var list<string> $tempFiles */
+        $tempFiles = [];
 
-        $zip->addFromString('lists.csv', $this->csv(
-            ['name', 'description', 'contacts', 'created_at'],
-            ContactList::withCount('contacts')->orderBy('id'),
-            fn (ContactList $l): array => [$l->name, $l->description, $l->contacts_count, $l->created_at?->toIso8601String()],
-        ));
+        try {
+            $this->addQueryAsCsv(
+                $zip,
+                'contacts.csv',
+                ['email', 'first_name', 'last_name', 'status', 'custom_fields', 'created_at'],
+                Contact::withTrashed(),
+                fn (Contact $c): array => [
+                    $c->email, $c->first_name, $c->last_name, $c->status,
+                    json_encode($c->custom_fields ?: new stdClass),
+                    $c->created_at?->toIso8601String(),
+                ],
+                $tempFiles,
+            );
 
-        $zip->addFromString('campaigns.csv', $this->csv(
-            ['name', 'subject', 'status', 'recipients', 'sent', 'failed', 'skipped', 'created_at', 'completed_at'],
-            Campaign::withTrashed()->orderBy('id'),
-            fn (Campaign $c): array => [
-                $c->name, $c->subject, $c->status, $c->recipients_count,
-                $c->sent_count, $c->failed_count, $c->skipped_count,
-                $c->created_at?->toIso8601String(), $c->completed_at?->toIso8601String(),
-            ],
-        ));
+            $this->addQueryAsCsv(
+                $zip,
+                'lists.csv',
+                ['name', 'description', 'contacts', 'created_at'],
+                ContactList::withCount('contacts'),
+                fn (ContactList $l): array => [$l->name, $l->description, $l->contacts_count, $l->created_at?->toIso8601String()],
+                $tempFiles,
+            );
 
-        $zip->addFromString('engagement.csv', $this->csv(
-            ['campaign_id', 'contact_id', 'type', 'url', 'occurred_at'],
-            CampaignEvent::query()->orderBy('id'),
-            fn (CampaignEvent $e): array => [
-                $e->campaign_id, $e->contact_id, $e->type, $e->url, $e->created_at?->toIso8601String(),
-            ],
-        ));
+            $this->addQueryAsCsv(
+                $zip,
+                'campaigns.csv',
+                ['name', 'subject', 'status', 'recipients', 'sent', 'failed', 'skipped', 'created_at', 'completed_at'],
+                Campaign::withTrashed(),
+                fn (Campaign $c): array => [
+                    $c->name, $c->subject, $c->status, $c->recipients_count,
+                    $c->sent_count, $c->failed_count, $c->skipped_count,
+                    $c->created_at?->toIso8601String(), $c->completed_at?->toIso8601String(),
+                ],
+                $tempFiles,
+            );
 
-        $zip->addFromString('team.csv', $this->csv(
-            ['name', 'email', 'role', 'email_verified_at', 'created_at'],
-            User::withoutGlobalScopes()->where('tenant_id', $tenant->getKey())->orderBy('id'),
-            fn (User $u): array => [
-                $u->name, $u->email, $u->role,
-                $u->email_verified_at?->toIso8601String(), $u->created_at?->toIso8601String(),
-            ],
-        ));
+            $this->addQueryAsCsv(
+                $zip,
+                'engagement.csv',
+                ['campaign_id', 'contact_id', 'type', 'url', 'occurred_at'],
+                CampaignEvent::query(),
+                fn (CampaignEvent $e): array => [
+                    $e->campaign_id, $e->contact_id, $e->type, $e->url, $e->created_at?->toIso8601String(),
+                ],
+                $tempFiles,
+            );
 
-        // Configuration without credentials: enough to rebuild the setup
-        // elsewhere, not enough to send as this customer.
-        $zip->addFromString('smtp-relays.csv', $this->csv(
-            ['name', 'host', 'port', 'encryption', 'from_email', 'from_name', 'daily_limit', 'status'],
-            SmtpAccount::withTrashed()->orderBy('id'),
-            fn (SmtpAccount $a): array => [
-                $a->name, $a->host, $a->port, $a->encryption,
-                $a->from_email, $a->from_name, $a->daily_limit, $a->status,
-            ],
-        ));
+            $this->addQueryAsCsv(
+                $zip,
+                'team.csv',
+                ['name', 'email', 'role', 'email_verified_at', 'created_at'],
+                User::withoutGlobalScopes()->where('tenant_id', $tenant->getKey()),
+                fn (User $u): array => [
+                    $u->name, $u->email, $u->role,
+                    $u->email_verified_at?->toIso8601String(), $u->created_at?->toIso8601String(),
+                ],
+                $tempFiles,
+            );
 
-        $zip->close();
+            // Configuration without credentials: enough to rebuild the setup
+            // elsewhere, not enough to send as this customer.
+            $this->addQueryAsCsv(
+                $zip,
+                'smtp-relays.csv',
+                ['name', 'host', 'port', 'encryption', 'from_email', 'from_name', 'daily_limit', 'status'],
+                SmtpAccount::withTrashed(),
+                fn (SmtpAccount $a): array => [
+                    $a->name, $a->host, $a->port, $a->encryption,
+                    $a->from_email, $a->from_name, $a->daily_limit, $a->status,
+                ],
+                $tempFiles,
+            );
+
+            $zip->close();
+        } finally {
+            foreach ($tempFiles as $tempFile) {
+                if (file_exists($tempFile)) {
+                    @unlink($tempFile);
+                }
+            }
+        }
 
         return $relative;
     }
 
     /**
-     * Stream a query to CSV in chunks.
+     * Stream a query to CSV on disk in chunks and add to the zip.
      *
      * @param  \Illuminate\Database\Eloquent\Builder<covariant \Illuminate\Database\Eloquent\Model>|\Illuminate\Database\Query\Builder  $query
      * @param  callable(mixed): list<mixed>  $row
      * @param  list<string>  $headers
+     * @param  list<string>  $tempFiles
      */
-    private function csv(array $headers, $query, callable $row): string
+    private function addQueryAsCsv(ZipArchive $zip, string $entryName, array $headers, $query, callable $row, array &$tempFiles): void
     {
-        $handle = fopen('php://temp', 'r+');
+        $tempPath = tempnam(sys_get_temp_dir(), 'export_');
+
+        if ($tempPath === false) {
+            throw new RuntimeException('Could not open a temporary file for the export.');
+        }
+
+        $tempFiles[] = $tempPath;
+
+        $handle = fopen($tempPath, 'w+');
 
         if ($handle === false) {
             throw new RuntimeException('Could not open a temporary stream for the export.');
@@ -188,17 +226,15 @@ class BuildWorkspaceExportJob implements ShouldQueue
         fwrite($handle, "\xEF\xBB\xBF");
         fputcsv($handle, $headers, escape: '');
 
-        $query->chunk(1000, function ($records) use ($handle, $row): void {
+        $query->chunkById(1000, function ($records) use ($handle, $row): void {
             foreach ($records as $record) {
-                fputcsv($handle, $row($record), escape: '');
+                fputcsv($handle, \App\Support\CsvSanitizer::sanitizeRow($row($record)), escape: '');
             }
         });
 
-        rewind($handle);
-        $contents = (string) stream_get_contents($handle);
         fclose($handle);
 
-        return $contents;
+        $zip->addFile($tempPath, $entryName);
     }
 
     /** @return array<string, mixed> */

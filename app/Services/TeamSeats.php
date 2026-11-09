@@ -49,11 +49,11 @@ final class TeamSeats
     }
 
     /** Seats still available, or null when unlimited. */
-    public function remaining(Tenant $tenant): ?int
+    public function remaining(Tenant $tenant, ?int $used = null): ?int
     {
         $limit = $this->limit($tenant);
 
-        return $limit === null ? null : max(0, $limit - $this->used($tenant));
+        return $limit === null ? null : max(0, $limit - ($used ?? $this->used($tenant)));
     }
 
     public function canInvite(Tenant $tenant): bool

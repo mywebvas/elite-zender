@@ -44,9 +44,7 @@
             <p class="text-xs text-slate-500 dark:text-slate-400 mt-1">
                 Trigger: {{ ucwords(str_replace('_', ' ', $auto->trigger_type)) }}
             </p>
-            @if($auto->steps)
-            <p class="text-xs text-slate-400 mt-0.5">{{ count($auto->steps) }} step{{ count($auto->steps) !== 1 ? 's' : '' }}</p>
-            @endif
+            <p class="text-xs text-slate-400 mt-0.5">{{ $auto->steps_count }} {{ Str::plural('step', $auto->steps_count) }}</p>
         </div>
 
         <div class="flex items-center gap-2 pt-3 border-t border-slate-100 dark:border-white/[0.05]">

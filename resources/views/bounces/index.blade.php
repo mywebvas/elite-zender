@@ -1,5 +1,16 @@
-<x-layouts.app header="Bounce Shield™">
+<x-layouts.app header="Bounces">
     <div class="max-w-7xl mx-auto space-y-6">
+
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-white/[0.06]">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Bounce Activity</h1>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Track delivery dropoffs, hard bounce suppressions, and mailbox diagnostic feedback.</p>
+            </div>
+            <a href="{{ route('settings.index') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors shadow-xs">
+                <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                <span>IMAP Settings</span>
+            </a>
+        </div>
         
         <!-- Header Cards -->
         <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -56,10 +67,10 @@
                     <h3 class="text-base font-semibold text-slate-900 dark:text-white">Recent Bounces</h3>
                     <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Real-time log of IMAP bounce processing</p>
                 </div>
-                <x-button variant="secondary" class="text-xs" @click="window.$toast('Configure Bounce Shield IMAP settings in Settings to enable this feature.', 'info')">
-                    <svg class="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                    Process Inbox Now
-                </x-button>
+                <a href="{{ route('settings.index') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200/80 dark:border-white/10 bg-white dark:bg-white/[0.04] text-slate-700 dark:text-slate-300 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors">
+                    <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>Configure Mailbox</span>
+                </a>
             </div>
             
             <div class="overflow-x-auto">

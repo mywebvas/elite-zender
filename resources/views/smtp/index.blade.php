@@ -38,13 +38,13 @@
             this.modalOpen = true;
         }
     }">
-        <div class="sm:flex sm:items-center sm:justify-between mb-8">
+        <div class="sm:flex sm:items-center sm:justify-between mb-8 pb-2 border-b border-slate-200/80 dark:border-white/[0.06]">
             <div>
-                <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">SMTP Relays & Rotation</h2>
-                <p class="mt-1 text-sm text-slate-600 dark:text-slate-400">Manage your sender accounts. The system automatically rotates through healthy relays.</p>
+                <h1 class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">SMTP Relay Pool</h1>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Connect your SMTP relays for automated sending, pool rotation, and quota management.</p>
             </div>
             <div class="mt-4 sm:ml-16 sm:mt-0 sm:flex-none">
-                <x-button variant="primary" @click="openAdd()">
+                <x-button variant="primary" @click="openAdd()" class="text-xs">
                     <svg class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
                     </svg>

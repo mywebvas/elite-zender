@@ -2,22 +2,22 @@
     <div class="space-y-6" x-data="{ importOpen: false, addOpen: false }">
 
         {{-- Page Header & Actions --}}
-        <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-slate-200/80 dark:border-white/[0.06]">
             <div>
-                <h2 class="text-2xl font-black text-slate-900 dark:text-white tracking-tight">Global Audience</h2>
-                <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Manage your subscribers, verify delivery status, and organize tags.</p>
+                <h1 class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">Audience</h1>
+                <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Manage subscribers, monitor delivery engagement, and segment lists.</p>
             </div>
             
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2.5">
                 <button type="button" @click="importOpen = true"
-                        class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white dark:bg-white/[0.04] text-slate-700 dark:text-slate-200 ring-1 ring-slate-200 dark:ring-white/10 text-sm font-semibold hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors">
-                    <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                    Import CSV
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white dark:bg-white/[0.04] text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 text-xs font-semibold hover:bg-slate-50 dark:hover:bg-white/[0.08] transition-colors shadow-xs">
+                    <svg class="w-3.5 h-3.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    <span>Import CSV</span>
                 </button>
 
-                <button type="button" @click="addOpen = true" class="btn-gradient">
-                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-                    Add Subscriber
+                <button type="button" @click="addOpen = true" class="btn-gradient text-xs">
+                    <svg class="w-3.5 h-3.5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+                    <span>Add Subscriber</span>
                 </button>
             </div>
         </div>

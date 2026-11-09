@@ -40,7 +40,7 @@
     </script>
 </head>
 
-<body class="h-full bg-slate-50 dark:bg-[#070A10] font-sans antialiased text-slate-900 dark:text-slate-100">
+<body class="h-full bg-[#f8fafc] dark:bg-[#090a0f] font-sans antialiased text-slate-900 dark:text-slate-100">
 
     @isset($impersonating)
         @if($impersonating)
@@ -71,23 +71,23 @@
 
         {{-- Desktop Collapsible Sidebar --}}
         <aside
-            :class="sidebarOpen ? 'w-56' : 'w-16'"
-            class="hidden lg:flex flex-col flex-shrink-0 transition-all duration-200 ease-out bg-[#1E1B4B] dark:bg-[#0A0E18] border-r border-white/5 dark:border-white/[0.06] overflow-hidden z-30"
+            :class="sidebarOpen ? 'w-60' : 'w-16'"
+            class="hidden lg:flex flex-col flex-shrink-0 transition-all duration-200 ease-out bg-white dark:bg-[#0c0d12] border-r border-slate-200/80 dark:border-white/[0.06] overflow-hidden z-30"
         >
             {{-- Logomark Header --}}
-            <div class="flex items-center h-16 px-4 border-b border-white/5 dark:border-white/[0.06]">
+            <div class="flex items-center h-16 px-4 border-b border-slate-200/80 dark:border-white/[0.06]">
                 <div class="flex items-center gap-3 min-w-0">
-                    <div class="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center flex-shrink-0 text-white">
-                        <svg class="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center flex-shrink-0 text-white shadow-sm shadow-indigo-500/20">
+                        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                         </svg>
                     </div>
-                    <span x-show="sidebarOpen" x-transition class="text-[14px] font-bold text-white tracking-tight truncate">{{ config('platform.name') }}</span>
+                    <span x-show="sidebarOpen" x-transition class="text-[14px] font-bold text-slate-900 dark:text-white tracking-tight truncate">{{ config('platform.name') }}</span>
                 </div>
             </div>
 
             {{-- Nav Items --}}
-            <nav class="flex-1 py-4 space-y-1 px-2 overflow-y-auto" aria-label="Main navigation">
+            <nav class="flex-1 py-4 space-y-1 px-2.5 overflow-y-auto" aria-label="Main navigation">
                 @php
                     $navItems = [
                         ['route' => 'dashboard',       'label' => 'Dashboard',  'icon' => 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6'],
@@ -108,14 +108,14 @@
                     @php $active = request()->routeIs(str_replace('#', '', $item['route']) . '*'); @endphp
                     <a
                         href="{{ $item['route'] === '#' ? '#' : route($item['route']) }}"
-                        class="group flex items-center gap-3 px-2.5 py-2 rounded-xl text-[13px] font-medium transition-all duration-150
+                        class="group flex items-center gap-3 px-3 py-2 rounded-xl text-[13px] font-medium transition-all duration-150
                             {{ $active
-                                ? 'bg-white/15 text-white font-semibold dark:bg-indigo-500/20 dark:text-indigo-300'
-                                : 'text-indigo-100/80 hover:bg-white/10 hover:text-white dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-slate-200'
+                                ? 'bg-slate-100 text-slate-950 font-semibold shadow-xs dark:bg-white/[0.08] dark:text-white'
+                                : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-slate-200'
                             }}"
                         title="{{ $item['label'] }}"
                     >
-                        <svg class="w-5 h-5 flex-shrink-0 {{ $active ? 'text-white dark:text-indigo-400' : 'text-indigo-200/70 group-hover:text-white dark:text-slate-400 dark:group-hover:text-slate-300' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+                        <svg class="w-4 h-4 flex-shrink-0 {{ $active ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 group-hover:text-slate-700 dark:text-slate-500 dark:group-hover:text-slate-300' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.8" aria-hidden="true">
                             <path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}"/>
                         </svg>
                         <span x-show="sidebarOpen" x-transition class="truncate">{{ $item['label'] }}</span>
@@ -124,11 +124,11 @@
             </nav>
 
             {{-- Sidebar Collapse Toggle --}}
-            <div class="p-2 border-t border-white/5 dark:border-white/[0.06]">
+            <div class="p-2 border-t border-slate-200/80 dark:border-white/[0.06]">
                 <button
                     type="button"
                     @click="sidebarOpen = !sidebarOpen"
-                    class="w-full flex items-center justify-center p-2 rounded-xl text-indigo-200/70 hover:text-white hover:bg-white/10 dark:text-slate-400 dark:hover:bg-white/[0.04] dark:hover:text-slate-300 transition-colors focus:outline-none"
+                    class="w-full flex items-center justify-center p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100/70 dark:text-slate-500 dark:hover:bg-white/[0.04] dark:hover:text-slate-300 transition-colors focus:outline-none"
                     :aria-label="sidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'"
                 >
                     <svg class="w-4 h-4 transition-transform duration-200" :class="sidebarOpen ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -142,7 +142,7 @@
         <div class="flex flex-col flex-1 min-w-0 overflow-hidden">
 
             {{-- Sticky Header Bar --}}
-            <header class="flex items-center h-16 px-4 lg:px-6 gap-4 bg-white/80 dark:bg-[#0A0E18]/80 backdrop-blur-md border-b border-slate-200/80 dark:border-white/[0.06] z-20 sticky top-0 flex-shrink-0">
+            <header class="flex items-center h-16 px-4 lg:px-6 gap-4 bg-white/80 dark:bg-[#0c0d12]/80 backdrop-blur-md border-b border-slate-200/80 dark:border-white/[0.06] z-20 sticky top-0 flex-shrink-0">
 
                 {{-- Mobile menu button --}}
                 <button
@@ -272,7 +272,7 @@
 
     {{-- Mobile Bottom Nav Bar (< lg) --}}
     <nav
-        class="lg:hidden fixed bottom-0 inset-x-0 bg-white/90 dark:bg-[#0A0E18]/90 backdrop-blur-xl border-t border-slate-200/80 dark:border-white/10 flex items-center justify-around px-2 pb-safe z-40 transition-colors"
+        class="lg:hidden fixed bottom-0 inset-x-0 bg-white/90 dark:bg-[#0c0d12]/90 backdrop-blur-xl border-t border-slate-200/80 dark:border-white/[0.08] flex items-center justify-around px-2 pb-safe z-40 transition-colors"
         style="padding-bottom: max(env(safe-area-inset-bottom), 8px);"
         aria-label="Bottom navigation"
     >
@@ -298,8 +298,8 @@
         <a href="{{ route('campaigns.create') }}"
            class="flex flex-col items-center -mt-5"
            aria-label="New campaign">
-            <div class="w-13 h-13 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 ring-4 ring-white dark:ring-[#070A10]">
-                <svg class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+            <div class="w-12 h-12 rounded-2xl bg-indigo-600 flex items-center justify-center shadow-lg shadow-indigo-500/30 ring-4 ring-white dark:ring-[#090a0f]">
+                <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
                 </svg>
             </div>
@@ -341,28 +341,28 @@
                  x-transition:leave="transition ease-in-out duration-200 transform"
                  x-transition:leave-start="translate-x-0"
                  x-transition:leave-end="-translate-x-full"
-                 class="relative mr-16 flex w-full max-w-xs flex-1 flex-col bg-[#1E1B4B] dark:bg-[#0A0E18] pb-4 pt-5 border-r border-white/10">
+                 class="relative mr-16 flex w-full max-w-xs flex-1 flex-col bg-white dark:bg-[#0c0d12] pb-4 pt-5 border-r border-slate-200/80 dark:border-white/10">
                 <div class="absolute right-0 top-0 -mr-12 pt-2">
-                    <button type="button" @click="mobileMenuOpen = false" class="ml-1 flex h-10 w-10 items-center justify-center rounded-full text-white focus:outline-none">
+                    <button type="button" @click="mobileMenuOpen = false" class="ml-1 flex h-10 w-10 items-center justify-center rounded-full text-slate-400 hover:text-white focus:outline-none">
                         <span class="sr-only">Close sidebar</span>
                         <svg class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
                     </button>
                 </div>
                 <div class="flex flex-shrink-0 items-center px-4 gap-3">
-                    <div class="w-8 h-8 rounded-xl bg-indigo-500/20 border border-indigo-500/30 flex items-center justify-center text-white">
-                        <svg class="w-4 h-4 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    <div class="w-8 h-8 rounded-xl bg-indigo-600 flex items-center justify-center text-white shadow-sm shadow-indigo-500/20">
+                        <svg class="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                     </div>
-                    <span class="text-[15px] font-bold text-white tracking-tight">{{ config('platform.name') }}</span>
+                    <span class="text-[15px] font-bold text-slate-900 dark:text-white tracking-tight">{{ config('platform.name') }}</span>
                 </div>
                 <div class="mt-5 h-0 flex-1 overflow-y-auto">
-                    <nav class="space-y-1 px-2">
+                    <nav class="space-y-1 px-2.5">
                         @foreach($navItems as $item)
                         @continue(isset($item['ability']) && auth()->user()?->cannot($item['ability'], App\Models\User::class))
                         @php $active = request()->routeIs(str_replace('#', '', $item['route']) . '*'); @endphp
                         <a href="{{ $item['route'] === '#' ? '#' : route($item['route']) }}"
                            class="group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors
-                           {{ $active ? 'bg-white/20 text-white font-bold' : 'text-indigo-100 hover:bg-white/10 hover:text-white' }}">
-                            <svg class="h-5 w-5 flex-shrink-0 {{ $active ? 'text-white' : 'text-indigo-200' }}" fill="none" viewBox="0 0 24 24" stroke-width="1.6" stroke="currentColor">
+                           {{ $active ? 'bg-slate-100 text-slate-950 font-bold dark:bg-white/10 dark:text-white' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-white/5 dark:hover:text-slate-200' }}">
+                            <svg class="h-5 w-5 flex-shrink-0 {{ $active ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke-width="1.8" stroke="currentColor">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="{{ $item['icon'] }}" />
                             </svg>
                             {{ $item['label'] }}

@@ -13,17 +13,28 @@
     </a>
 </div>
 
-{{-- Filter chips --}}
-<div class="flex items-center gap-2 mb-6 overflow-x-auto pb-1"
-     x-data="{ filter: 'all' }">
-    @foreach(['all','draft','sending','completed','paused'] as $f)
-    <button @click="filter = '{{ $f }}'"
-            :class="filter === '{{ $f }}' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/10 ring-1 ring-slate-200 dark:ring-white/10'"
-            :aria-pressed="filter === '{{ $f }}'"
-            class="px-4 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap">
-        {{ ucfirst($f === 'all' ? 'All campaigns' : $f) }}
-    </button>
-    @endforeach
+<div x-data="{ filter: 'all', search: '' }">
+
+{{-- Filter chips & Search --}}
+<div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-6">
+    <div class="flex items-center gap-2 overflow-x-auto pb-1">
+        @foreach(['all','draft','sending','completed','paused'] as $f)
+        <button type="button" @click="filter = '{{ $f }}'"
+                :class="filter === '{{ $f }}' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white dark:bg-white/5 text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-white/10 ring-1 ring-slate-200 dark:ring-white/10'"
+                :aria-pressed="filter === '{{ $f }}'"
+                class="px-4 py-1.5 rounded-full text-sm font-semibold transition-all whitespace-nowrap">
+            {{ ucfirst($f === 'all' ? 'All campaigns' : $f) }}
+        </button>
+        @endforeach
+    </div>
+
+    <div class="relative w-full sm:w-64">
+        <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input type="text" x-model="search" placeholder="Search campaigns…"
+               class="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-white/[0.04] pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+    </div>
 </div>
 
 {{-- Campaign Cards --}}
@@ -46,7 +57,7 @@
     };
 @endphp
 <div class="card p-5 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-slate-300 dark:hover:border-white/15 transition-all duration-150"
-     x-show="filter === 'all' || filter === '{{ $campaign->status }}'">
+     x-show="(filter === 'all' || filter === '{{ $campaign->status }}') && (!search || '{{ strtolower(addslashes($campaign->name)) }}'.includes(search.toLowerCase()))">
 
     {{-- Left: Icon + Title + Meta --}}
     <div class="flex items-start sm:items-center gap-3.5 min-w-0 flex-1">
@@ -112,9 +123,11 @@
             </a>
 
             <form action="{{ route('campaigns.destroy', $campaign) }}" method="POST"
-                  onsubmit="return confirm('Permanently delete this campaign?')">
+                  x-data="{ deleting: false }"
+                  @submit="if(deleting){ $event.preventDefault(); return false; } if(!confirm('Permanently delete this campaign?')){ return false; } deleting = true;">
                 @csrf @method('DELETE')
-                <button type="submit" aria-label="Delete campaign"
+                <button type="submit" :disabled="deleting" aria-label="Delete campaign"
+                        :class="{ 'opacity-50 cursor-not-allowed': deleting }"
                         class="inline-flex items-center p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
                     <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -150,5 +163,7 @@
         {{ $campaigns->links() }}
     </div>
 @endif
+
+</div>
 
 </x-layouts.app>

@@ -113,7 +113,7 @@
                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Update your workspace identity, operating timezone, and billing details.</p>
                         </div>
                         <div class="p-6">
-                            <form method="POST" action="{{ route('settings.update') }}" x-data="{ saving: false }" @submit="saving = true" class="space-y-6">
+                            <form method="POST" action="{{ route('settings.update') }}" x-data="{ saving: false }" @submit="if(saving){ $event.preventDefault(); return false; } saving = true;" class="space-y-6">
                                 @csrf
                                 @method('PUT')
 
@@ -248,7 +248,7 @@
                             <h3 class="text-lg font-semibold text-slate-900 dark:text-white">Bounce Shield (Auto-Cleaner)</h3>
                             <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Configure an IMAP inbox to automatically scan bounce notices, analyze error codes, and suppress dead addresses every 15 minutes.</p>
                         </div>
-                        <form method="POST" action="{{ route('settings.imap') }}" x-data="{ saving: false }" @submit="saving = true" class="p-6 space-y-6">
+                        <form method="POST" action="{{ route('settings.imap') }}" x-data="{ saving: false }" @submit="if(saving){ $event.preventDefault(); return false; } saving = true;" class="p-6 space-y-6">
                             @csrf
                             @method('PUT')
 
@@ -326,7 +326,7 @@
                             </p>
                         </div>
 
-                        <form method="POST" action="{{ route('settings.notifications') }}" x-data="{ saving: false }" @submit="saving = true" class="space-y-6 p-6">
+                        <form method="POST" action="{{ route('settings.notifications') }}" x-data="{ saving: false }" @submit="if(saving){ $event.preventDefault(); return false; } saving = true;" class="space-y-6 p-6">
                             @csrf
                             @method('PUT')
 
@@ -379,7 +379,7 @@
                                             Generates a complete ZIP containing all contacts, subscriber activity, campaigns, relay metrics, and team rosters in standard CSV format. Credentials and secrets are safely omitted.
                                         </p>
                                     </div>
-                                    <form method="POST" action="{{ route('data.export') }}" class="flex-shrink-0" x-data="{ exporting: false }" @submit="exporting = true">
+                                    <form method="POST" action="{{ route('data.export') }}" class="flex-shrink-0" x-data="{ exporting: false }" @submit="if(exporting){ $event.preventDefault(); return false; } exporting = true;">
                                         @csrf
                                         <x-button type="submit" variant="secondary" x-bind:disabled="exporting">
                                             <svg x-show="exporting" class="w-4 h-4 animate-spin mr-1.5" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
@@ -436,10 +436,14 @@
                                                 <p class="mt-1 text-xs text-rose-800 dark:text-rose-300">
                                                     During the {{ App\Models\DataRequest::DELETION_GRACE_DAYS }}-day grace period, all services remain active. You can cancel at any point prior to the deadline.
                                                 </p>
-                                                <form method="POST" action="{{ route('data.delete.cancel', $pendingDeletion) }}" class="mt-3.5">
+                                                <form method="POST" action="{{ route('data.delete.cancel', $pendingDeletion) }}" class="mt-3.5"
+                                                      x-data="{ cancelling: false }" @submit="if(cancelling){ $event.preventDefault(); return false; } cancelling = true;">
                                                     @csrf
                                                     @method('DELETE')
-                                                    <x-button type="submit" variant="primary">Cancel Deletion & Keep Workspace</x-button>
+                                                    <x-button type="submit" variant="primary" ::disabled="cancelling">
+                                                        <span x-show="!cancelling">Cancel Deletion & Keep Workspace</span>
+                                                        <span x-show="cancelling" x-cloak>Cancelling…</span>
+                                                    </x-button>
                                                 </form>
                                             </div>
                                         </div>
@@ -460,7 +464,7 @@
 
                                     {{-- Deletion Confirmation Modal --}}
                                     <x-modal x-show="deleteModalOpen" @close-modal="deleteModalOpen = false" title="Delete Workspace Permanently" size="md">
-                                        <form method="POST" action="{{ route('data.delete') }}" x-data="{ deleting: false }" @submit="deleting = true" class="space-y-4">
+                                        <form method="POST" action="{{ route('data.delete') }}" x-data="{ deleting: false }" @submit="if(deleting){ $event.preventDefault(); return false; } deleting = true;" class="space-y-4">
                                             @csrf
 
                                             <div class="p-3.5 rounded-xl bg-rose-50 dark:bg-rose-500/10 border border-rose-200 dark:border-rose-500/20 text-xs text-rose-700 dark:text-rose-300">

@@ -129,12 +129,14 @@
 
                     {{-- Separate action forms to ensure clean HTML and standard CSRF/methods --}}
                     <form id="toggle-{{ $admin->id }}" method="POST" action="{{ route('admin.team.toggle', $admin->id) }}" class="hidden"
-                          onsubmit="return confirm('{{ $admin->is_active ? 'Deactivate' : 'Reinstate' }} {{ $admin->email }}? Access will terminate immediately.')">
+                          x-data="{ toggling: false }"
+                          @submit="if(toggling){ $event.preventDefault(); return false; } if(!confirm('{{ $admin->is_active ? 'Deactivate' : 'Reinstate' }} {{ $admin->email }}? Access will terminate immediately.')){ return false; } toggling = true;">
                         @csrf
                     </form>
 
                     <form id="reset-{{ $admin->id }}" method="POST" action="{{ route('admin.team.reset-password', $admin->id) }}" class="hidden"
-                          onsubmit="return confirm('Generate and issue a new temporary password for {{ $admin->email }}?')">
+                          x-data="{ resetting: false }"
+                          @submit="if(resetting){ $event.preventDefault(); return false; } if(!confirm('Generate and issue a new temporary password for {{ $admin->email }}?')){ return false; } resetting = true;">
                         @csrf
                     </form>
                 </div>

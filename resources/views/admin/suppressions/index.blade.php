@@ -75,14 +75,16 @@
                                 @if(auth('admin')->user()?->canManage())
                                     <form method="POST" action="{{ route('admin.suppressions.destroy', $entry->id) }}"
                                           class="flex flex-wrap items-center gap-2"
-                                          onsubmit="return confirm('Un-suppressing this address risks sending blocklists if it previously hard-bounced. Proceed?')">
+                                          x-data="{ removing: false }"
+                                          @submit="if(removing){ $event.preventDefault(); return false; } if(!confirm('Un-suppressing this address risks sending blocklists if it previously hard-bounced. Proceed?')){ return false; } removing = true;">
                                         @csrf
                                         @method('DELETE')
                                         <input name="reason" required minlength="5" maxlength="255" placeholder="Reason for removal (required)…"
                                                class="rounded-xl border-0 bg-white/[0.04] px-3 py-1.5 text-xs text-white ring-1 ring-white/10 placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-rose-500/50 w-64">
-                                        <button type="submit"
+                                        <button type="submit" :disabled="removing"
+                                                :class="{ 'opacity-60 cursor-not-allowed': removing }"
                                                 class="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-1.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 active:scale-[0.98]">
-                                            Remove
+                                            <span x-text="removing ? 'Removing…' : 'Remove'">Remove</span>
                                         </button>
                                     </form>
                                 @endif

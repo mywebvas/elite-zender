@@ -91,7 +91,7 @@
             <form id="campaign-form" method="POST"
                   action="{{ isset($campaign) ? route('campaigns.update', $campaign->id) : route('campaigns.store') }}"
                   class="flex-1 flex overflow-y-auto"
-                  @submit="syncEditor">
+                  @submit="if (saving) { $event.preventDefault(); return false; } syncEditor(); saving = true;">
                 @csrf
                 @isset($campaign)
                     @method('PUT')
@@ -434,9 +434,13 @@
 
             handleImage() {
                 const url = prompt('Image URL (public HTTPS):');
-                if (url && this.quill) {
-                    const range = this.quill.getSelection(true);
-                    this.quill.insertEmbed(range.index, 'image', url);
+                if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+                    if (this.quill) {
+                        const range = this.quill.getSelection(true);
+                        this.quill.insertEmbed(range.index, 'image', url);
+                    }
+                } else if (url) {
+                    alert('Please provide a secure (https://) image URL.');
                 }
             },
 

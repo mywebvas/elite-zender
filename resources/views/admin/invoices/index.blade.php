@@ -266,11 +266,13 @@
                                 <td class="px-6 py-4 whitespace-nowrap text-right">
                                     @if(! $invoice->isPaid() && $invoice->status !== 'void' && auth('admin')->user()?->canManage())
                                         <form method="POST" action="{{ route('admin.invoices.void', $invoice->id) }}"
-                                              onsubmit="return confirm('Void invoice {{ $invoice->number }} permanently?')">
+                                              x-data="{ voiding: false }"
+                                              @submit="if(voiding){ $event.preventDefault(); return false; } if(!confirm('Void invoice {{ $invoice->number }} permanently?')){ return false; } voiding = true;">
                                             @csrf
-                                            <button type="submit"
+                                            <button type="submit" :disabled="voiding"
+                                                    :class="{ 'opacity-60 cursor-not-allowed': voiding }"
                                                     class="rounded-lg border border-white/5 px-2.5 py-1 text-xs font-medium text-slate-400 transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300">
-                                                Void
+                                                <span x-text="voiding ? 'Voiding…' : 'Void'">Void</span>
                                             </button>
                                         </form>
                                     @endif
@@ -324,11 +326,13 @@
                         @if(! $invoice->isPaid() && $invoice->status !== 'void' && auth('admin')->user()?->canManage())
                             <div class="pt-1">
                                 <form method="POST" action="{{ route('admin.invoices.void', $invoice->id) }}"
-                                      onsubmit="return confirm('Void invoice {{ $invoice->number }} permanently?')">
+                                      x-data="{ voiding: false }"
+                                      @submit="if(voiding){ $event.preventDefault(); return false; } if(!confirm('Void invoice {{ $invoice->number }} permanently?')){ return false; } voiding = true;">
                                     @csrf
-                                    <button type="submit"
+                                    <button type="submit" :disabled="voiding"
+                                            :class="{ 'opacity-60 cursor-not-allowed': voiding }"
                                             class="w-full rounded-lg border border-white/10 bg-white/[0.02] py-2 text-xs font-medium text-slate-400 hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300 transition">
-                                        Void Invoice
+                                        <span x-text="voiding ? 'Voiding Invoice…' : 'Void Invoice'">Void Invoice</span>
                                     </button>
                                 </form>
                             </div>

@@ -38,7 +38,7 @@
             this.modalOpen = true;
         }
     }">
-        <div class="sm:flex sm:items-center sm:justify-between mb-8 pb-2 border-b border-slate-200/80 dark:border-white/[0.06]">
+        <div class="sm:flex sm:items-center sm:justify-between mb-6 pb-2 border-b border-slate-200/80 dark:border-white/[0.06]">
             <div>
                 <h1 class="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">SMTP Relay Pool</h1>
                 <p class="mt-1 text-xs text-slate-500 dark:text-slate-400">Connect your SMTP relays for automated sending, pool rotation, and quota management.</p>
@@ -52,6 +52,43 @@
                 </x-button>
             </div>
         </div>
+
+        @if($accounts->isNotEmpty())
+        @php
+            $totalRelays = $accounts->count();
+            $activeRelays = $accounts->where('status', 'active')->count();
+            $totalDailyQuota = $accounts->sum('daily_limit');
+            $totalSentToday = $accounts->sum('sent_today');
+            $avgHealth = round($accounts->avg('health_score') ?? 100);
+        @endphp
+        {{-- Pool Capacity Summary Strip --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mb-6">
+            <div class="card p-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Active Relays</p>
+                <p class="text-xl font-extrabold text-slate-900 dark:text-white mt-1">
+                    {{ $activeRelays }} <span class="text-xs font-normal text-slate-400">/ {{ $totalRelays }}</span>
+                </p>
+            </div>
+            <div class="card p-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Daily Capacity</p>
+                <p class="text-xl font-extrabold text-slate-900 dark:text-white font-mono mt-1">
+                    {{ number_format($totalDailyQuota) }}
+                </p>
+            </div>
+            <div class="card p-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Sent Today</p>
+                <p class="text-xl font-extrabold text-slate-900 dark:text-white font-mono mt-1">
+                    {{ number_format($totalSentToday) }}
+                </p>
+            </div>
+            <div class="card p-4">
+                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Avg Health Score</p>
+                <p class="text-xl font-extrabold mt-1 {{ $avgHealth >= 80 ? 'text-emerald-500' : ($avgHealth >= 50 ? 'text-amber-500' : 'text-rose-500') }}">
+                    {{ $avgHealth }}<span class="text-xs font-normal text-slate-400">/100</span>
+                </p>
+            </div>
+        </div>
+        @endif
 
         <div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
             @forelse ($accounts as $account)
@@ -104,15 +141,21 @@
                                 Edit
                             </button>
                             <span class="text-slate-300 dark:text-white/10">|</span>
-                            <form action="{{ route('smtp-accounts.destroy', $account) }}" method="POST" onsubmit="return confirm('Are you sure you want to remove this SMTP relay?');" class="inline">
+                            <form action="{{ route('smtp-accounts.destroy', $account) }}" method="POST"
+                                  x-data="{ deleting: false }"
+                                  @submit="if(deleting){ $event.preventDefault(); return false; } if(!confirm('Are you sure you want to remove this SMTP relay?')){ return false; } deleting = true;" class="inline">
                                 @csrf
                                 @method('DELETE')
-                                <button type="submit" class="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 transition-colors">Delete</button>
+                                <button type="submit" :disabled="deleting"
+                                        :class="{ 'opacity-50 cursor-not-allowed': deleting }"
+                                        class="text-xs font-semibold text-rose-600 hover:text-rose-700 dark:text-rose-400 transition-colors">
+                                    <span x-text="deleting ? 'Deleting...' : 'Delete'">Delete</span>
+                                </button>
                             </form>
                         </div>
 
                         <form method="POST" action="{{ route('smtp-accounts.test', $account->id) }}"
-                              x-data="{ testing: false }" @submit="testing = true">
+                              x-data="{ testing: false }" @submit="if(testing){ $event.preventDefault(); return false; } testing = true;">
                             @csrf
                             <button type="submit" :disabled="testing"
                                     class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-60 dark:text-slate-300 dark:bg-white/5 dark:border-white/10 dark:hover:bg-white/10 transition-colors">
@@ -141,7 +184,7 @@
 
         {{-- Add / Edit Modal --}}
         <x-modal x-show="modalOpen" @close-modal="modalOpen = false" alpine-title="isEditing ? 'Edit SMTP Relay' : 'Connect SMTP Relay'">
-            <form :action="formAction" method="POST" class="space-y-4" @submit="saving = true">
+            <form :action="formAction" method="POST" class="space-y-4" @submit="if(saving){ $event.preventDefault(); return false; } saving = true;">
                 @csrf
                 <template x-if="isEditing">
                     <input type="hidden" name="_method" value="PUT">

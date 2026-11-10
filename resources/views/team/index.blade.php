@@ -52,7 +52,7 @@
                 no second verification step.
             </p>
 
-            <form method="POST" action="{{ route('team.invite') }}" x-data="{ inviting: false }" @submit="inviting = true" class="mt-4 flex flex-col gap-3 sm:flex-row">
+            <form method="POST" action="{{ route('team.invite') }}" x-data="{ inviting: false }" @submit="if(inviting){ $event.preventDefault(); return false; } inviting = true;" class="mt-4 flex flex-col gap-3 sm:flex-row">
                 @csrf
 
                 <div class="flex-1">
@@ -115,17 +115,23 @@
                         </div>
 
                         <div class="flex flex-shrink-0 items-center gap-2">
-                            <form method="POST" action="{{ route('team.invitations.resend', $invitation) }}">
+                            <form method="POST" action="{{ route('team.invitations.resend', $invitation) }}"
+                                  x-data="{ resending: false }" @submit="if(resending){ $event.preventDefault(); return false; } resending = true;">
                                 @csrf
-                                <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 dark:text-slate-300 dark:ring-white/10 dark:hover:bg-white/[0.06]">
-                                    Resend
+                                <button type="submit" :disabled="resending"
+                                        :class="{ 'opacity-60 cursor-not-allowed': resending }"
+                                        class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 dark:text-slate-300 dark:ring-white/10 dark:hover:bg-white/[0.06]">
+                                    <span x-text="resending ? 'Resending…' : 'Resend'">Resend</span>
                                 </button>
                             </form>
                             <form method="POST" action="{{ route('team.invitations.revoke', $invitation) }}"
-                                  onsubmit="return confirm('Revoke the invitation to {{ $invitation->email }}? The link in their email stops working immediately.')">
+                                  x-data="{ revoking: false }"
+                                  @submit="if(revoking){ $event.preventDefault(); return false; } if(!confirm('Revoke the invitation to {{ $invitation->email }}? The link in their email stops working immediately.')){ return false; } revoking = true;">
                                 @csrf @method('DELETE')
-                                <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">
-                                    Revoke
+                                <button type="submit" :disabled="revoking"
+                                        :class="{ 'opacity-60 cursor-not-allowed': revoking }"
+                                        class="rounded-lg px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">
+                                    <span x-text="revoking ? 'Revoking…' : 'Revoke'">Revoke</span>
                                 </button>
                             </form>
                         </div>
@@ -184,10 +190,13 @@
 
                         @can('remove', $member)
                             <form method="POST" action="{{ route('team.members.remove', $member) }}"
-                                  onsubmit="return confirm('Remove {{ $member->name }}? Their sessions and API tokens are revoked immediately. Nothing they created is deleted.')">
+                                  x-data="{ removing: false }"
+                                  @submit="if(removing){ $event.preventDefault(); return false; } if(!confirm('Remove {{ $member->name }}? Their sessions and API tokens are revoked immediately. Nothing they created is deleted.')){ return false; } removing = true;">
                                 @csrf @method('DELETE')
-                                <button type="submit" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">
-                                    Remove
+                                <button type="submit" :disabled="removing"
+                                        :class="{ 'opacity-60 cursor-not-allowed': removing }"
+                                        class="rounded-lg px-3 py-1.5 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10">
+                                    <span x-text="removing ? 'Removing…' : 'Remove'">Remove</span>
                                 </button>
                             </form>
                         @endcan

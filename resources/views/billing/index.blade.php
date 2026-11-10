@@ -55,14 +55,20 @@
 
             <div class="flex flex-shrink-0 flex-wrap items-center gap-2">
                 @if($subscription?->isEnding())
-                    <form method="POST" action="{{ route('billing.resume') }}">
+                    <form method="POST" action="{{ route('billing.resume') }}" x-data="{ submitting: false }" @submit="if(submitting){ $event.preventDefault(); return false; } submitting = true">
                         @csrf
-                        <x-button type="submit" variant="primary">Keep my plan</x-button>
+                        <x-button type="submit" variant="primary" ::disabled="submitting">
+                            <span x-show="!submitting">Keep my plan</span>
+                            <span x-show="submitting" x-cloak>Resuming…</span>
+                        </x-button>
                     </form>
                 @elseif($pending)
-                    <form method="POST" action="{{ route('billing.keep-plan') }}">
+                    <form method="POST" action="{{ route('billing.keep-plan') }}" x-data="{ submitting: false }" @submit="if(submitting){ $event.preventDefault(); return false; } submitting = true">
                         @csrf
-                        <x-button type="submit" variant="secondary">Cancel scheduled change</x-button>
+                        <x-button type="submit" variant="secondary" ::disabled="submitting">
+                            <span x-show="!submitting">Cancel scheduled change</span>
+                            <span x-show="submitting" x-cloak>Cancelling…</span>
+                        </x-button>
                     </form>
                 @elseif($subscription && $current && ! $current->isFree())
                     {{--
@@ -76,7 +82,7 @@
                         <x-button type="button" variant="ghost" @click="open = true">Cancel plan</x-button>
 
                         <x-modal x-show="open" @close-modal="open = false" title="Before you go">
-                            <form method="POST" action="{{ route('billing.cancel') }}" x-data="{ saving: false }" @submit="saving = true" class="space-y-5">
+                            <form method="POST" action="{{ route('billing.cancel') }}" x-data="{ saving: false }" @submit="if(saving){ $event.preventDefault(); return false; } saving = true" class="space-y-5">
                                 @csrf
 
                                 <p class="text-sm leading-relaxed text-slate-600 dark:text-slate-300">

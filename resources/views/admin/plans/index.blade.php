@@ -257,9 +257,10 @@
 
                 {{-- Separate form for Archive/Delete to avoid invalid nested <form> --}}
                 <form id="archive-{{ $plan->id }}" method="POST" action="{{ route('admin.plans.destroy', $plan->id) }}" class="hidden"
-                      onsubmit="return confirm('{{ $plan->subscriptions_count > 0
+                      x-data="{ archiving: false }"
+                      @submit="if(archiving){ $event.preventDefault(); return false; } if(!confirm('{{ $plan->subscriptions_count > 0
                           ? 'Archive '.$plan->name.'? Existing subscribers keep it; nobody new can choose it.'
-                          : 'Delete '.$plan->name.' permanently?' }}')">
+                          : 'Delete '.$plan->name.' permanently?' }}')){ return false; } archiving = true;">
                     @csrf
                     @method('DELETE')
                     <input type="hidden" name="reason" value="Archived from the plans page">

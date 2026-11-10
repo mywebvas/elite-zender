@@ -90,15 +90,17 @@
                                 @if($key->status() === 'active')
                                     <div class="shrink-0 pt-1">
                                         <form method="POST" action="{{ route('admin.api-keys.destroy', $key->id) }}"
-                                              onsubmit="return confirm('Revoke “{{ $key->name }}”? Any request using it fails immediately.')">
+                                              x-data="{ revoking: false }"
+                                              @submit="if(revoking){ $event.preventDefault(); return false; } if(!confirm('Revoke “{{ $key->name }}”? Any request using it fails immediately.')){ return false; } revoking = true;">
                                             @csrf
                                             @method('DELETE')
-                                            <button type="submit"
+                                            <button type="submit" :disabled="revoking"
+                                                    :class="{ 'opacity-60 cursor-not-allowed': revoking }"
                                                     class="inline-flex items-center gap-1 rounded-xl border border-rose-500/30 bg-rose-500/10 px-3.5 py-1.5 text-xs font-semibold text-rose-300 transition hover:bg-rose-500/20 active:scale-[0.98]">
                                                 <svg class="h-3.5 w-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                     <path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
                                                 </svg>
-                                                <span>Revoke</span>
+                                                <span x-text="revoking ? 'Revoking…' : 'Revoke'">Revoke</span>
                                             </button>
                                         </form>
                                     </div>

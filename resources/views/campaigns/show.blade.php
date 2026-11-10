@@ -33,21 +33,29 @@
             @endif
             
             @if(in_array($campaign->status, ['completed', 'sent']))
-                <form action="{{ route('campaigns.retarget', $campaign->id) }}" method="POST">
+                <form action="{{ route('campaigns.retarget', $campaign->id) }}" method="POST"
+                      x-data="{ retargeting: false }"
+                      @submit="if(retargeting){ $event.preventDefault(); return false; } retargeting = true;">
                     @csrf
-                    <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-400 dark:hover:bg-sky-500/20 transition-all">
+                    <button type="submit" :disabled="retargeting"
+                            :class="{ 'opacity-60 cursor-not-allowed': retargeting }"
+                            class="inline-flex items-center justify-center gap-2 rounded-xl px-5 py-2.5 text-sm font-semibold text-sky-700 bg-sky-50 hover:bg-sky-100 dark:bg-sky-500/10 dark:text-sky-400 dark:hover:bg-sky-500/20 transition-all">
                         <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122" />
                         </svg>
-                        Retarget Non-Openers
+                        <span x-text="retargeting ? 'Creating Campaign...' : 'Retarget Non-Openers'">Retarget Non-Openers</span>
                     </button>
                 </form>
             @endif
             
-            <form action="{{ route('campaigns.destroy', $campaign->id) }}" method="POST" onsubmit="return confirm('Are you sure you want to delete this campaign?');">
+            <form action="{{ route('campaigns.destroy', $campaign->id) }}" method="POST"
+                  x-data="{ deleting: false }"
+                  @submit="if(deleting){ $event.preventDefault(); return false; } if(!confirm('Are you sure you want to delete this campaign?')){ return false; } deleting = true;">
                 @csrf @method('DELETE')
-                <button type="submit" class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all" {{ $campaign->status === 'sending' ? 'disabled' : '' }}>
-                    Delete
+                <button type="submit" :disabled="deleting || {{ $campaign->status === 'sending' ? 'true' : 'false' }}"
+                        :class="{ 'opacity-60 cursor-not-allowed': deleting }"
+                        class="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-all" {{ $campaign->status === 'sending' ? 'disabled' : '' }}>
+                    <span x-text="deleting ? 'Deleting...' : 'Delete'">Delete</span>
                 </button>
             </form>
         </div>

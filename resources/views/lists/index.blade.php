@@ -15,7 +15,7 @@
             </button>
 
             <x-modal x-show="open" @close-modal="open = false" title="Create New List">
-                <form action="{{ route('lists.store') }}" method="POST" @submit="saving = true" class="space-y-5">
+                <form action="{{ route('lists.store') }}" method="POST" @submit="if(saving){ $event.preventDefault(); return false; } saving = true;" class="space-y-5">
                     @csrf
                     <div>
                         <label class="input-label" for="list-name">List Name</label>
@@ -62,9 +62,12 @@
                         </svg>
                     </div>
                     <form action="{{ route('lists.destroy', $list->id) }}" method="POST"
-                          onsubmit="return confirm('Are you sure you want to delete this list? Contacts in this list will not be deleted.')" class="inline">
+                          x-data="{ deleting: false }"
+                          @submit="if(deleting){ $event.preventDefault(); return false; } if(!confirm('Are you sure you want to delete this list? Contacts in this list will not be deleted.')){ return false; } deleting = true;" class="inline">
                         @csrf @method('DELETE')
-                        <button type="submit" title="Delete list" class="p-1.5 rounded-lg text-slate-300 dark:text-slate-600 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
+                        <button type="submit" :disabled="deleting" title="Delete list"
+                                :class="{ 'opacity-50 cursor-not-allowed': deleting }"
+                                class="p-1.5 rounded-lg text-slate-300 dark:text-slate-600 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-500/10 transition-colors">
                             <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
                             </svg>

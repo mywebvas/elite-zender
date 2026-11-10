@@ -75,28 +75,32 @@
                     @if($failedCount > 0)
                         <div class="flex flex-wrap items-center gap-2">
                             <form method="POST" action="{{ route('admin.system.retry') }}"
-                                  onsubmit="return confirm('Re-queue all {{ $failedCount }} failed jobs across all queue lanes?')">
+                                  x-data="{ retrying: false }"
+                                  @submit="if(retrying){ $event.preventDefault(); return false; } if(!confirm('Re-queue all {{ $failedCount }} failed jobs across all queue lanes?')){ return false; } retrying = true;">
                                 @csrf
                                 <input type="hidden" name="uuid" value="all">
-                                <button type="submit"
+                                <button type="submit" :disabled="retrying"
+                                        :class="{ 'opacity-60 cursor-not-allowed': retrying }"
                                         class="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-2 text-xs font-semibold text-slate-950 shadow-sm transition hover:bg-amber-400 active:scale-[0.98]">
                                     <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                     </svg>
-                                    Retry all
+                                    <span x-text="retrying ? 'Re-queuing…' : 'Retry all'">Retry all</span>
                                 </button>
                             </form>
 
                             <form method="POST" action="{{ route('admin.system.forget') }}"
-                                  onsubmit="return confirm('Discard all {{ $failedCount }} failed jobs permanently? This cannot be undone.')">
+                                  x-data="{ discarding: false }"
+                                  @submit="if(discarding){ $event.preventDefault(); return false; } if(!confirm('Discard all {{ $failedCount }} failed jobs permanently? This cannot be undone.')){ return false; } discarding = true;">
                                 @csrf
                                 <input type="hidden" name="uuid" value="all">
-                                <button type="submit"
+                                <button type="submit" :disabled="discarding"
+                                        :class="{ 'opacity-60 cursor-not-allowed': discarding }"
                                         class="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-xs font-semibold text-slate-300 transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300 active:scale-[0.98]">
                                     <svg class="h-3.5 w-3.5 text-rose-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                                     </svg>
-                                    Discard all
+                                    <span x-text="discarding ? 'Discarding…' : 'Discard all'">Discard all</span>
                                 </button>
                             </form>
                         </div>
@@ -140,27 +144,31 @@
 
                                 {{-- Job Action Buttons --}}
                                 <div class="flex shrink-0 items-center gap-2 pt-1">
-                                    <form method="POST" action="{{ route('admin.system.retry') }}">
+                                    <form method="POST" action="{{ route('admin.system.retry') }}"
+                                          x-data="{ retrying: false }" @submit="if(retrying){ $event.preventDefault(); return false; } retrying = true;">
                                         @csrf
                                         <input type="hidden" name="uuid" value="{{ $job->uuid }}">
-                                        <button type="submit"
+                                        <button type="submit" :disabled="retrying"
+                                                :class="{ 'opacity-60 cursor-not-allowed': retrying }"
                                                 class="inline-flex items-center gap-1 rounded-lg border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/[0.1] hover:text-white"
                                                 title="Retry this specific failed job">
                                             <svg class="h-3.5 w-3.5 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                                             </svg>
-                                            Retry
+                                            <span x-text="retrying ? 'Retrying…' : 'Retry'">Retry</span>
                                         </button>
                                     </form>
 
                                     <form method="POST" action="{{ route('admin.system.forget') }}"
-                                          onsubmit="return confirm('Discard job {{ $job->uuid }}?')">
+                                          x-data="{ discarding: false }"
+                                          @submit="if(discarding){ $event.preventDefault(); return false; } if(!confirm('Discard job {{ $job->uuid }}?')){ return false; } discarding = true;">
                                         @csrf
                                         <input type="hidden" name="uuid" value="{{ $job->uuid }}">
-                                        <button type="submit"
+                                        <button type="submit" :disabled="discarding"
+                                                :class="{ 'opacity-60 cursor-not-allowed': discarding }"
                                                 class="inline-flex items-center gap-1 rounded-lg border border-white/5 bg-transparent px-2.5 py-1.5 text-xs font-medium text-slate-400 transition hover:border-rose-500/30 hover:bg-rose-500/10 hover:text-rose-300"
                                                 title="Drop from failed jobs queue">
-                                            Discard
+                                            <span x-text="discarding ? 'Discarding…' : 'Discard'">Discard</span>
                                         </button>
                                     </form>
                                 </div>

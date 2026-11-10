@@ -38,7 +38,7 @@
 
                 <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
                     {{-- Filter by List --}}
-                    <select name="list_id" onchange="this.form.submit()" class="input py-2 text-xs w-full sm:w-auto">
+                    <select name="list_id" @change="$el.form.requestSubmit()" class="input py-2 text-xs w-full sm:w-auto">
                         <option value="">All Lists</option>
                         @foreach($lists as $list)
                             <option value="{{ $list->id }}" @selected(request('list_id') == $list->id)>
@@ -48,7 +48,7 @@
                     </select>
 
                     {{-- Filter by Tag --}}
-                    <select name="tag_id" onchange="this.form.submit()" class="input py-2 text-xs w-full sm:w-auto">
+                    <select name="tag_id" @change="$el.form.requestSubmit()" class="input py-2 text-xs w-full sm:w-auto">
                         <option value="">All Tags</option>
                         @foreach($tags as $tag)
                             <option value="{{ $tag->id }}" @selected(request('tag_id') == $tag->id)>
@@ -58,7 +58,7 @@
                     </select>
 
                     {{-- Filter by Status --}}
-                    <select name="status" onchange="this.form.submit()" class="input py-2 text-xs w-full sm:w-auto">
+                    <select name="status" @change="$el.form.requestSubmit()" class="input py-2 text-xs w-full sm:w-auto">
                         <option value="">All Statuses</option>
                         <option value="active" @selected(request('status') === 'active')>Subscribed</option>
                         <option value="unsubscribed" @selected(request('status') === 'unsubscribed')>Unsubscribed</option>
@@ -133,11 +133,15 @@
                                 </td>
                                 <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                     <form action="{{ route('contacts.destroy', $contact->id) }}" method="POST"
-                                          onsubmit="return confirm('Delete this subscriber from your audience?');" class="inline-block">
+                                          x-data="{ deleting: false }"
+                                          @submit="if(deleting){ $event.preventDefault(); return false; } if(!confirm('Delete this subscriber from your audience?')){ return false; } deleting = true;"
+                                          class="inline-block">
                                         @csrf
                                         @method('DELETE')
-                                        <button type="submit" class="text-xs font-semibold text-rose-600 hover:text-rose-900 dark:text-rose-400 dark:hover:text-rose-300 transition-colors">
-                                            Delete
+                                        <button type="submit" :disabled="deleting"
+                                                :class="{ 'opacity-50 cursor-not-allowed': deleting }"
+                                                class="text-xs font-semibold text-rose-600 hover:text-rose-900 dark:text-rose-400 dark:hover:text-rose-300 transition-colors">
+                                            <span x-text="deleting ? 'Deleting...' : 'Delete'">Delete</span>
                                         </button>
                                     </form>
                                 </td>
@@ -173,7 +177,7 @@
 
         {{-- Import CSV Modal --}}
         <x-modal x-show="importOpen" @close-modal="importOpen = false" title="Import Contacts">
-            <form action="{{ route('contacts.import') }}" method="POST" enctype="multipart/form-data" class="space-y-4" x-data="{ loading: false }" @submit="loading = true">
+            <form action="{{ route('contacts.import') }}" method="POST" enctype="multipart/form-data" class="space-y-4" x-data="{ loading: false }" @submit="if(loading){ $event.preventDefault(); return false; } loading = true;">
                 @csrf
                 <div>
                     <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wider mb-1.5">Upload CSV File</label>
@@ -206,7 +210,7 @@
 
         {{-- Add Single Contact Modal --}}
         <x-modal x-show="addOpen" @close-modal="addOpen = false" title="Add Contact">
-            <form action="{{ route('contacts.store') }}" method="POST" class="space-y-4" x-data="{ saving: false }" @submit="saving = true">
+            <form action="{{ route('contacts.store') }}" method="POST" class="space-y-4" x-data="{ saving: false }" @submit="if(saving){ $event.preventDefault(); return false; } saving = true;">
                 @csrf
                 <div>
                     <label class="input-label" for="contact-email">Email Address</label>
